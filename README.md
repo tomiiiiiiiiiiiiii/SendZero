@@ -215,3 +215,11 @@ Incomplete uploads automatically expire after 6 hours.
 - Set web-server request/body limits above the 8 MiB chunk size.
 - Resumable uploads and File System Access downloads are supported.
 - Consider adding an explicit transfer manager UI for listing, cancelling and clearing interrupted transfers.
+
+## License
+
+SendZero is licensed under the **GNU Affero General Public License v3.0 only (AGPL-3.0-only)**.
+
+You may use, study, modify, and redistribute the software under the terms of the AGPLv3. If you modify SendZero and make that modified version available to users over a network, you must offer those users access to the corresponding source code as required by the license.
+
+See [LICENSE](LICENSE) for the full license text.
