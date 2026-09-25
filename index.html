@@ -67,6 +67,10 @@
 
       <button class="primary" id="sendBtn" disabled data-i18n="encrypt_upload">Encrypt & upload</button>
 
+      <p class="termsNotice">
+        <a href="terms.html" data-i18n="upload_terms">By uploading, you agree to the Terms and confirm that the file does not contain prohibited content.</a>
+      </p>
+
       <div class="progressWrap hidden" id="progressWrap">
         <div class="progress"><span id="progressBar"></span></div>
         <p id="status" data-i18n="preparing">Preparing…</p>
@@ -102,7 +106,11 @@
 
     <footer>
       <span>SendZero</span>
-      <span data-i18n="footer_private">Private file sharing</span>
+      <span class="footerLinks">
+        <span data-i18n="footer_private">Private file sharing</span>
+        <span aria-hidden="true">·</span>
+        <a href="terms.html" data-i18n="terms_link">Terms</a>
+      </span>
     </footer>
   </main>
 
