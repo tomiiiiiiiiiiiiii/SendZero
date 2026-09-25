@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Receive with SendZero</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="shell receiveShell">
+    <header class="topbar">
+      <a class="brand" href="./"><span class="brandMark">0</span><span>SendZero</span></a>
+      <span class="pill">encrypted transfer</span>
+    </header>
+
+    <section class="card receiveCard">
+      <p class="eyebrow">PRIVATE TRANSFER</p>
+      <h1 id="title">Opening secure link…</h1>
+      <p class="lede small" id="description">Checking the encrypted payload.</p>
+
+      <div class="filePanel hidden" id="filePanel">
+        <div class="fileIcon">↓</div>
+        <div>
+          <strong id="fileName">Encrypted file</strong>
+          <span id="fileMeta"></span>
+        </div>
+      </div>
+
+      <button class="primary hidden" id="downloadBtn">Decrypt & save</button>
+
+      <div class="progressWrap hidden" id="progressWrap">
+        <div class="progress"><span id="progressBar"></span></div>
+        <p id="status">Downloading encrypted data…</p>
+      </div>
+
+      <div class="notice hidden" id="notice"></div>
+    </section>
+
+    <footer>
+      <span>The decryption key stays in this browser.</span>
+    </footer>
+  </main>
+
+  <script src="assets/download.js"></script>
+</body>
+</html>
