@@ -32,8 +32,28 @@ if (!sz_check_upload_token($meta, $token)) {
     sz_json(array('ok' => false, 'error' => 'forbidden'), 403);
 }
 
-if (!isset($_FILES['payload']) || $_FILES['payload']['error'] !== UPLOAD_ERR_OK) {
+if (!isset($_FILES['payload'])) {
     sz_json(array('ok' => false, 'error' => 'missing_payload'), 400);
+}
+
+$uploadError = isset($_FILES['payload']['error'])
+    ? (int)$_FILES['payload']['error']
+    : UPLOAD_ERR_NO_FILE;
+
+if ($uploadError === UPLOAD_ERR_INI_SIZE || $uploadError === UPLOAD_ERR_FORM_SIZE) {
+    sz_json(array(
+        'ok' => false,
+        'error' => 'request_too_large',
+        'limit' => 'upload_max_filesize'
+    ), 413);
+}
+
+if ($uploadError !== UPLOAD_ERR_OK) {
+    sz_json(array(
+        'ok' => false,
+        'error' => 'upload_failed',
+        'upload_error' => $uploadError
+    ), 400);
 }
 
 $size = (int)$_FILES['payload']['size'];
