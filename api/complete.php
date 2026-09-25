@@ -84,6 +84,10 @@ flock($fh, LOCK_UN);
 fclose($fh);
 @chmod($metaPath, 0600);
 
+if (!empty($meta['client_tag'])) {
+    sz_active_upload_release((string)$meta['client_tag'], $id);
+}
+
 sz_json(array(
     'ok' => true,
     'id' => $id,
