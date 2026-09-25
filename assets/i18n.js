@@ -45,7 +45,7 @@
       faq_q13: 'Do I need an account?',
       faq_a13: 'No. Sending and receiving files does not require registration or a SendZero account.',
       faq_q14: 'How do I report an abusive transfer?',
-      faq_a14: 'Email abuse@sendzero.link with the SendZero transfer URL and a clear description. Do not include the decryption key unless it is necessary for the report.',
+      faq_a14: 'Use the Report abuse link below with the SendZero transfer URL and a clear description. Do not include the decryption key unless it is necessary for the report.',
       faq_note: 'For service rules and technical privacy details, see the Terms of Use and Privacy Policy.',
       privacy_pill: 'privacy',
       privacy_eyebrow: 'PRIVACY POLICY',
@@ -64,7 +64,7 @@
       privacy_6_title: '6. Accounts, cookies and tracking',
       privacy_6_text: 'The current SendZero service does not require an account and does not depend on third-party advertising trackers. The application uses browser storage for language and resume features rather than requiring an account.',
       privacy_7_title: '7. Abuse and contact',
-      privacy_7_text: 'For suspected misuse or an abusive transfer, contact abuse@sendzero.link. Include the transfer URL and a clear description of the issue. Do not include the decryption key unless it is necessary for the report.',
+      privacy_7_text: 'For suspected misuse or an abusive transfer, use the Report abuse link below. Include the transfer URL and a clear description of the issue. Do not include the decryption key unless it is necessary for the report.',
       privacy_note: 'This policy describes the current technical design of SendZero. Infrastructure and legal requirements may evolve with the service.',
       privacy_link: 'Privacy',
       terms_pill: 'acceptable use',
@@ -96,6 +96,7 @@
       terms_note: 'These are basic service rules and an acceptable-use policy. They do not replace any mandatory rights or obligations under applicable law.',
       terms_link: 'Terms',
       report_abuse: 'Report abuse',
+      abuse_email_link: 'Email abuse team',
       abuse_contact: 'Abuse reports:',
       upload_terms: 'By uploading, you agree to the Terms and confirm that the file does not contain prohibited content.',
       back_home: 'Back to SendZero',
@@ -258,7 +259,7 @@
       faq_q13: 'Brauche ich ein Konto?',
       faq_a13: 'Nein. Zum Senden und Empfangen von Dateien ist keine Registrierung und kein SendZero-Konto erforderlich.',
       faq_q14: 'Wie melde ich einen missbräuchlichen Transfer?',
-      faq_a14: 'Schreibe an abuse@sendzero.link und gib die SendZero-Transfer-URL sowie eine klare Beschreibung an. Übermittle den Entschlüsselungsschlüssel nur, wenn er für die Meldung erforderlich ist.',
+      faq_a14: 'Nutze den Link „Missbrauch melden“ unten und gib die SendZero-Transfer-URL sowie eine klare Beschreibung an. Übermittle den Entschlüsselungsschlüssel nur, wenn er für die Meldung erforderlich ist.',
       faq_note: 'Regeln zur Nutzung und technische Datenschutzdetails findest du in den Nutzungsbedingungen und der Datenschutzerklärung.',
       privacy_pill: 'Datenschutz',
       privacy_eyebrow: 'DATENSCHUTZ',
@@ -277,7 +278,7 @@
       privacy_6_title: '6. Konten, Cookies und Tracking',
       privacy_6_text: 'Der aktuelle SendZero-Dienst benötigt kein Benutzerkonto und ist nicht von Drittanbieter-Werbetrackern abhängig. Für Sprache und Resume-Funktionen verwendet die Anwendung Browser-Speicher statt eines Kontos.',
       privacy_7_title: '7. Missbrauch und Kontakt',
-      privacy_7_text: 'Bei vermutetem Missbrauch oder einem missbräuchlichen Transfer kontaktiere abuse@sendzero.link. Gib die Transfer-URL und eine klare Beschreibung an. Übermittle den Entschlüsselungsschlüssel nur, wenn er für die Meldung erforderlich ist.',
+      privacy_7_text: 'Bei vermutetem Missbrauch oder einem missbräuchlichen Transfer nutze den Link „Missbrauch melden“ unten. Gib die Transfer-URL und eine klare Beschreibung an. Übermittle den Entschlüsselungsschlüssel nur, wenn er für die Meldung erforderlich ist.',
       privacy_note: 'Diese Erklärung beschreibt die aktuelle technische Gestaltung von SendZero. Infrastruktur und rechtliche Anforderungen können sich mit dem Dienst weiterentwickeln.',
       privacy_link: 'Datenschutz',
       terms_pill: 'zulässige Nutzung',
@@ -309,6 +310,7 @@
       terms_note: 'Dies sind grundlegende Nutzungsregeln und eine Acceptable-Use-Policy. Zwingende Rechte und Pflichten nach geltendem Recht bleiben unberührt.',
       terms_link: 'Regeln',
       report_abuse: 'Missbrauch melden',
+      abuse_email_link: 'E-Mail an das Abuse-Team',
       abuse_contact: 'Missbrauch melden:',
       upload_terms: 'Mit dem Hochladen stimmst du den Regeln zu und bestätigst, dass die Datei keine verbotenen Inhalte enthält.',
       back_home: 'Zurück zu SendZero',
@@ -471,7 +473,7 @@
       faq_q13: 'Czy potrzebuję konta?',
       faq_a13: 'Nie. Wysyłanie i odbieranie plików nie wymaga rejestracji ani konta SendZero.',
       faq_q14: 'Jak zgłosić szkodliwy transfer?',
-      faq_a14: 'Napisz na abuse@sendzero.link, podając adres transferu SendZero i jasny opis problemu. Nie podawaj klucza deszyfrującego, chyba że jest niezbędny do rozpatrzenia zgłoszenia.',
+      faq_a14: 'Użyj poniższego linku „Zgłoś nadużycie”, podając adres transferu SendZero i jasny opis problemu. Nie podawaj klucza deszyfrującego, chyba że jest niezbędny do rozpatrzenia zgłoszenia.',
       faq_note: 'Zasady korzystania z usługi i techniczne informacje o prywatności znajdziesz w Regulaminie i Polityce prywatności.',
       privacy_pill: 'prywatność',
       privacy_eyebrow: 'POLITYKA PRYWATNOŚCI',
@@ -490,7 +492,7 @@
       privacy_6_title: '6. Konta, cookies i tracking',
       privacy_6_text: 'Obecna usługa SendZero nie wymaga konta i nie opiera się na zewnętrznych trackerach reklamowych. Aplikacja wykorzystuje pamięć przeglądarki do ustawień języka i funkcji resume zamiast wymagać konta.',
       privacy_7_title: '7. Nadużycia i kontakt',
-      privacy_7_text: 'W przypadku podejrzenia nadużycia lub szkodliwego transferu napisz na abuse@sendzero.link. Podaj adres transferu i jasny opis problemu. Nie podawaj klucza deszyfrującego, chyba że jest niezbędny do rozpatrzenia zgłoszenia.',
+      privacy_7_text: 'W przypadku podejrzenia nadużycia lub szkodliwego transferu użyj poniższego linku „Zgłoś nadużycie”. Podaj adres transferu i jasny opis problemu. Nie podawaj klucza deszyfrującego, chyba że jest niezbędny do rozpatrzenia zgłoszenia.'
       privacy_note: 'Ta polityka opisuje obecny techniczny model SendZero. Infrastruktura i wymagania prawne mogą zmieniać się wraz z rozwojem usługi.',
       privacy_link: 'Prywatność',
       terms_pill: 'zasady korzystania',
@@ -522,6 +524,7 @@
       terms_note: 'To podstawowe zasady korzystania z usługi i polityka dopuszczalnego użycia. Nie zastępują one bezwzględnie obowiązujących praw i obowiązków wynikających z właściwych przepisów.',
       terms_link: 'Regulamin',
       report_abuse: 'Zgłoś nadużycie',
+      abuse_email_link: 'Napisz do zespołu ds. nadużyć',
       abuse_contact: 'Zgłoszenia nadużyć:',
       upload_terms: 'Wysyłając plik, akceptujesz Regulamin i potwierdzasz, że plik nie zawiera zabronionych treści.',
       back_home: 'Wróć do SendZero',
@@ -718,6 +721,19 @@
     });
   }
 
+  function bindAbuseMailLinks() {
+    const decode = values => values.map(value => String.fromCharCode(value)).join('');
+    const scheme = [109, 97, 105, 108, 116, 111, 58];
+    const address = [97, 98, 117, 115, 101, 64, 115, 101, 110, 100, 122, 101, 114, 111, 46, 108, 105, 110, 107];
+
+    document.addEventListener('click', event => {
+      const link = event.target.closest('[data-abuse-mail]');
+      if (!link) return;
+      event.preventDefault();
+      window.location.href = decode(scheme) + decode(address);
+    });
+  }
+
   window.SendZeroI18n = {
     t,
     setLanguage,
@@ -726,6 +742,7 @@
   };
 
   bindLanguageSwitcher();
+  bindAbuseMailLinks();
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', applyStatic);
