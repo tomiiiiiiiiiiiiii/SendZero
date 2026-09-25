@@ -67,6 +67,12 @@ The upload page links to these rules directly below the upload button, and both 
 
 The terms are available in English, German and Polish through the same language selector as the rest of the interface.
 
+## Privacy Policy
+
+The public interface includes `privacy.html` in English, German and Polish.
+
+It documents client-side encryption, technical metadata, infrastructure logs, the HMAC-based application rate limiter, LocalStorage/IndexedDB resume state, retention and the abuse contact.
+
 ## Interface languages
 
 The web interface currently supports:
@@ -96,6 +102,26 @@ When the same file is selected again:
 The resume endpoint does not receive the decryption key or filename. A valid resume request extends the incomplete-upload lease by another 6 hours. Completed uploads remove the local resume record.
 
 To avoid accidentally resuming a different file, the browser builds a local fingerprint from the filename, size, modification time and sampled file content.
+
+## Sender revoke
+
+Every new transfer receives a separate random delete capability in addition to the upload token and encryption key.
+
+The server stores only a SHA-256 hash of the delete token. After upload completes, the sender can use **Delete transfer now** to remove the encrypted server copy before its normal expiry.
+
+The delete capability is not included in the recipient share URL.
+
+## Download abuse protection
+
+Normal downloads now use short-lived server-side download sessions. Each child node limits how many active readers may download the same transfer at once and tracks total egress per transfer.
+
+Default limits:
+
+- 8 active download sessions per transfer;
+- egress allowance of 20× the logical file size;
+- minimum egress allowance of 5 GiB for small files.
+
+These limits are configurable in `config.local.php`.
 
 ## Resumable downloads
 
@@ -188,6 +214,19 @@ See [docs/MULTI_SERVER.md](docs/MULTI_SERVER.md) for deployment examples for:
 - a dedicated master;
 - independent `s1`, `s2`, `s3` child nodes;
 - adding capacity when disk space or network capacity becomes constrained.
+
+## Abuse administration
+
+Run administration from the master server:
+
+```bash
+php sendzero-admin.php nodes
+php sendzero-admin.php status
+php sendzero-admin.php info s2 TRANSFER_ID
+php sendzero-admin.php delete s2 TRANSFER_ID
+```
+
+Remote operations are authenticated to child nodes with the existing per-node HMAC secret. See [docs/ADMIN.md](docs/ADMIN.md).
 
 ## Production test
 
