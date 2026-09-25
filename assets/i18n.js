@@ -725,12 +725,10 @@
     const decode = values => values.map(value => String.fromCharCode(value)).join('');
     const scheme = [109, 97, 105, 108, 116, 111, 58];
     const address = [97, 98, 117, 115, 101, 64, 115, 101, 110, 100, 122, 101, 114, 111, 46, 108, 105, 110, 107];
+    const target = decode(scheme) + decode(address);
 
-    document.addEventListener('click', event => {
-      const link = event.target.closest('[data-abuse-mail]');
-      if (!link) return;
-      event.preventDefault();
-      window.location.href = decode(scheme) + decode(address);
+    document.querySelectorAll('[data-abuse-mail]').forEach(link => {
+      link.setAttribute('href', target);
     });
   }
 
