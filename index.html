@@ -8,20 +8,31 @@
   <meta name="description" content="Encrypt in your browser. Share a link. The server never receives the decryption key.">
   <link rel="stylesheet" href="assets/style.css">
 </head>
-<body>
+<body data-page="home">
   <main class="shell">
     <header class="topbar">
-      <a class="brand" href="./" aria-label="SendZero home">
+      <a class="brand" href="./" data-i18n-aria="home_aria" aria-label="SendZero home">
         <span class="brandMark">0</span>
         <span>SendZero</span>
       </a>
-      <span class="pill">zero-access transfer</span>
+
+      <div class="topActions">
+        <span class="pill" data-i18n="pill_home">zero-access transfer</span>
+        <div class="languageSwitcher" aria-label="Language">
+          <button type="button" data-lang="en">EN</button>
+          <button type="button" data-lang="de">DE</button>
+          <button type="button" data-lang="pl">PL</button>
+        </div>
+      </div>
     </header>
 
     <section class="hero">
-      <p class="eyebrow">PRIVATE FILE SHARING</p>
-      <h1>Send a file.<br><span>Reveal nothing.</span></h1>
-      <p class="lede">
+      <p class="eyebrow" data-i18n="eyebrow_home">PRIVATE FILE SHARING</p>
+      <h1>
+        <span class="heroPrimary" data-i18n="hero_line1">Send a file.</span><br>
+        <span data-i18n="hero_line2">Reveal nothing.</span>
+      </h1>
+      <p class="lede" data-i18n="hero_text">
         Your file is encrypted locally before upload. The decryption key stays in the share link fragment and is never sent to SendZero.
       </p>
     </section>
@@ -30,61 +41,72 @@
       <label class="dropzone" id="dropzone" for="fileInput">
         <input id="fileInput" type="file" hidden>
         <span class="dropIcon">↑</span>
-        <strong id="dropTitle">Choose a file</strong>
-        <span id="dropText">or drop it here · max 5 GiB</span>
+        <strong id="dropTitle" data-i18n="choose_file">Choose a file</strong>
+        <span id="dropText" data-i18n="drop_file">or drop it here · max 5 GiB</span>
       </label>
 
       <div class="options">
-        <label>
-          <span>Expires after</span>
-          <select id="ttl">
-            <option value="3600">1 hour</option>
-            <option value="86400" selected>24 hours</option>
-            <option value="604800">7 days</option>
-          </select>
-        </label>
+        <div class="optionCard">
+          <span class="optionLabel" data-i18n="expires_after">Expires after</span>
+          <input id="ttl" type="hidden" value="86400">
+          <div class="ttlPicker" role="group" aria-label="Expiry">
+            <button type="button" data-ttl="3600" data-i18n="ttl_1h">1 hour</button>
+            <button type="button" data-ttl="86400" data-i18n="ttl_24h" class="active">24 hours</button>
+            <button type="button" data-ttl="604800" data-i18n="ttl_7d">7 days</button>
+          </div>
+        </div>
 
-        <label class="switchRow">
+        <label class="switchRow optionCard">
           <span>
-            <strong>One-time download</strong>
-            <small>Delete server copy after the first completed transfer.</small>
+            <strong data-i18n="one_time">One-time download</strong>
+            <small data-i18n="one_time_desc">Delete server copy after the first completed transfer.</small>
           </span>
           <input id="once" type="checkbox">
         </label>
       </div>
 
-      <button class="primary" id="sendBtn" disabled>Encrypt & upload</button>
+      <button class="primary" id="sendBtn" disabled data-i18n="encrypt_upload">Encrypt & upload</button>
 
       <div class="progressWrap hidden" id="progressWrap">
         <div class="progress"><span id="progressBar"></span></div>
-        <p id="status">Preparing…</p>
+        <p id="status" data-i18n="preparing">Preparing…</p>
       </div>
     </section>
 
     <section class="result card hidden" id="resultCard">
-      <p class="eyebrow">READY</p>
-      <h2>Your private link</h2>
-      <p class="muted">Anyone with the complete link can decrypt the file. The part after <code>#</code> is the key.</p>
+      <p class="eyebrow" data-i18n="ready">READY</p>
+      <h2 data-i18n="private_link">Your private link</h2>
+      <p class="muted" data-i18n="private_link_desc">Anyone with the complete link can decrypt the file. The part after # is the key.</p>
       <div class="copyRow">
         <input id="shareUrl" readonly>
-        <button id="copyBtn">Copy</button>
+        <button id="copyBtn" data-i18n="copy">Copy</button>
       </div>
       <p class="resultMeta" id="resultMeta"></p>
-      <button class="ghost" id="newBtn">Send another file</button>
+      <button class="ghost" id="newBtn" data-i18n="send_another">Send another file</button>
     </section>
 
     <section class="trust">
-      <div><strong>Chunked client-side encryption</strong><span>AES-256-GCM via Web Crypto. Up to 5 GiB.</span></div>
-      <div><strong>No account</strong><span>No sign-up is required.</span></div>
-      <div><strong>No key on server</strong><span>The URL fragment never reaches PHP.</span></div>
+      <div>
+        <strong data-i18n="trust_encrypt_title">Chunked client-side encryption</strong>
+        <span data-i18n="trust_encrypt_desc">AES-256-GCM via Web Crypto. Up to 5 GiB.</span>
+      </div>
+      <div>
+        <strong data-i18n="trust_account_title">No account</strong>
+        <span data-i18n="trust_account_desc">No sign-up is required.</span>
+      </div>
+      <div>
+        <strong data-i18n="trust_key_title">No key on server</strong>
+        <span data-i18n="trust_key_desc">The URL fragment never reaches PHP.</span>
+      </div>
     </section>
 
     <footer>
-      <span>SendZero MVP</span>
-      <span>PHP · JavaScript · HTML</span>
+      <span>SendZero</span>
+      <span data-i18n="footer_private">Private file sharing</span>
     </footer>
   </main>
 
+  <script src="assets/i18n.js"></script>
   <script src="assets/app.js"></script>
 </body>
 </html>
