@@ -4,7 +4,7 @@
 
 SendZero encrypts files in the browser before upload. The server stores encrypted manifests and encrypted chunks, while the decryption key remains in the URL fragment after `#` and is not sent to PHP.
 
-The project is currently in **pre-public testing**. The 5 GiB transfer path is implemented, but it should not be considered production-validated until the full checklist in [docs/TESTING.md](docs/TESTING.md) has passed on the deployed HTTPS instance.
+The project is currently in **pre-public testing**. The deployed HTTPS instance at `sendzero.link` has successfully completed normal upload/download tests, a full **5 GiB end-to-end transfer with matching SHA-256**, interrupted upload and download resume tests, one-time deletion, and sender revoke. Remaining operational and abuse-resistance checks are tracked in [docs/TESTING.md](docs/TESTING.md).
 
 ## Highlights
 
@@ -381,26 +381,30 @@ A hard configuration error returns a non-zero exit code.
 
 ## Pre-public testing
 
-Before advertising the service publicly, complete [docs/TESTING.md](docs/TESTING.md).
+The following checks have been verified on the deployed HTTPS instance at `sendzero.link`:
 
-At minimum verify:
-
-- normal upload/download;
+- normal upload and download;
 - full 5 GiB upload;
-- interrupted upload + resume;
 - full 5 GiB download;
+- SHA-256 equality between the original and downloaded 5 GiB file;
+- interrupted upload + resume;
 - interrupted download + resume;
-- SHA-256 equality between source and downloaded file;
 - one-time deletion;
 - sender revoke;
+- required security headers via the deployment preflight.
+
+Still to verify before treating the public deployment as fully tested:
+
 - Recent transfers revoke after page reload;
 - upload abuse limits;
 - download abuse limits;
 - disk emergency stop;
 - admin CLI deletion;
-- required security headers.
+- expiry cleanup behavior and scheduled cleanup execution.
 
-A completed 5 GiB transfer with a different SHA-256 hash is a release blocker.
+The complete procedure remains in [docs/TESTING.md](docs/TESTING.md).
+
+A completed transfer with a different SHA-256 hash is a release blocker.
 
 ## CI
 
@@ -506,12 +510,25 @@ Implemented:
 - multilingual public/legal UI;
 - automated syntax CI.
 
+Verified on the deployed HTTPS instance:
+
+- normal upload/download;
+- 5 GiB end-to-end transfer;
+- matching SHA-256 after download;
+- upload resume;
+- download resume;
+- one-time deletion;
+- sender revoke;
+- deployment security headers.
+
+The deployment preflight has also been run successfully, with operational warnings still requiring review.
+
 Still required before public launch:
 
-- run the deployment preflight on the real server;
-- confirm cleanup scheduling;
-- complete the production test checklist;
-- validate the real 5 GiB path end-to-end over HTTPS.
+- confirm cleanup scheduling and expiry cleanup behavior;
+- complete the remaining abuse-limit and disk-emergency tests;
+- test admin CLI operations on the deployed node;
+- complete the remaining items in the production test checklist.
 
 ## License
 
