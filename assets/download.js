@@ -20,6 +20,7 @@
 
   const params = new URLSearchParams(location.search);
   const id = params.get('id') || '';
+  const nodeId = params.get('n') || 'local';
   const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
   const encodedKey = hash.get('k') || '';
 
@@ -28,6 +29,7 @@
   let cryptoKey = null;
   let keyFingerprint = null;
   let resumeState = null;
+  let apiBase = '';
 
   function showError(message) {
     title.textContent = t('transfer_cannot_open');
@@ -152,6 +154,29 @@
     return data;
   }
 
+  function apiUrl(base, path) {
+    if (!base) return path;
+    return new URL(path, String(base).replace(/\/+$/, '') + '/').toString();
+  }
+
+  async function resolveNode() {
+    const response = await fetch('api/node.php?n=' + encodeURIComponent(nodeId), {
+      cache: 'no-store'
+    });
+
+    let data = null;
+    try { data = await response.json(); } catch (e) {}
+
+    if (!response.ok || !data || !data.ok) {
+      const error = new Error((data && data.error) || ('HTTP ' + response.status));
+      error.status = response.status;
+      throw error;
+    }
+
+    apiBase = data.api_base || '';
+    return data;
+  }
+
   async function decryptManifest(bytes) {
     if (bytes.length < 32) throw new Error('Invalid manifest');
 
@@ -201,6 +226,7 @@
       state &&
       state.handle &&
       state.id === id &&
+      (!state.node_id || state.node_id === nodeId) &&
       state.key_fingerprint === keyFingerprint &&
       state.size === manifest.size &&
       state.chunk_size === remoteInfo.chunk_size &&
@@ -239,7 +265,12 @@
         ['decrypt']
       );
 
-      const infoResponse = await fetch('api/info.php?id=' + encodeURIComponent(id), { cache: 'no-store' });
+      await resolveNode();
+
+      const infoResponse = await fetch(
+        apiUrl(apiBase, 'api/info.php') + '?id=' + encodeURIComponent(id),
+        { cache: 'no-store' }
+      );
       const info = await infoResponse.json();
 
       if (!infoResponse.ok || !info.ok) {
@@ -252,7 +283,10 @@
 
       remoteInfo = info;
 
-      const manifestResponse = await fetch('api/manifest.php?id=' + encodeURIComponent(id), { cache: 'no-store' });
+      const manifestResponse = await fetch(
+        apiUrl(apiBase, 'api/manifest.php') + '?id=' + encodeURIComponent(id),
+        { cache: 'no-store' }
+      );
       if (!manifestResponse.ok) throw new Error(t('manifest_unavailable'));
 
       manifest = await decryptManifest(new Uint8Array(await manifestResponse.arrayBuffer()));
@@ -353,6 +387,7 @@
 
       state = {
         id,
+        node_id: nodeId,
         handle,
         key_fingerprint: keyFingerprint,
         size: manifest.size,
@@ -553,7 +588,7 @@
           ? sink.state.download_token
           : '';
 
-      const session = await postForm('api/start.php', {
+      const session = await postForm(apiUrl(apiBase, 'api/start.php'), {
         id,
         token: previousToken
       });
@@ -589,7 +624,7 @@
 
       for (let index = startIndex; index < remoteInfo.chunk_count; index++) {
         if (downloadToken && Date.now() - lastSessionRefresh > 20 * 60 * 1000) {
-          const refreshed = await postForm('api/start.php', {
+          const refreshed = await postForm(apiUrl(apiBase, 'api/start.php'), {
             id,
             token: downloadToken
           });
@@ -602,7 +637,7 @@
           }
         }
 
-        const url = new URL('api/chunk_get.php', location.href);
+        const url = new URL(apiUrl(apiBase, 'api/chunk_get.php'), location.href);
         url.searchParams.set('id', id);
         url.searchParams.set('index', String(index));
 
@@ -643,7 +678,7 @@
 
       await sink.close();
 
-      await postForm('api/finish.php', {
+      await postForm(apiUrl(apiBase, 'api/finish.php'), {
         id,
         token: downloadToken
       });
@@ -681,7 +716,7 @@
         (!sink || !sink.resumable)
       ) {
         try {
-          await postForm('api/abort.php', { id, token: downloadToken });
+          await postForm(apiUrl(apiBase, 'api/abort.php'), { id, token: downloadToken });
         } catch (e) {}
       }
 
