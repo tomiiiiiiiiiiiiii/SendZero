@@ -46,6 +46,23 @@ define('SENDZERO_NODE_RESERVE_BYTES', (float)sz_config_value('reserve_bytes', 21
 define('SENDZERO_ALLOCATION_TTL', (int)sz_config_value('allocation_ttl', 300));
 define('SENDZERO_NODE_STATUS_TIMEOUT', (float)sz_config_value('node_status_timeout', 2.0));
 
+/* Public-service abuse protection. No database is required. */
+define('SENDZERO_RATE_LIMIT_ENABLED', sz_config_value('rate_limit_enabled', true) ? true : false);
+define('SENDZERO_RATE_MAX_ALLOCATIONS_PER_HOUR', (int)sz_config_value('rate_max_allocations_per_hour', 30));
+define('SENDZERO_RATE_MAX_BYTES_PER_DAY', (float)sz_config_value('rate_max_bytes_per_day', 26843545600)); // 25 GiB
+define('SENDZERO_NODE_MAX_ACTIVE_UPLOADS_PER_CLIENT', (int)sz_config_value('max_active_uploads_per_client', 3));
+
+/*
+ * Only use a forwarded-IP header when the web server is behind a trusted
+ * reverse proxy that overwrites it. Example: HTTP_CF_CONNECTING_IP.
+ * Empty by default so clients cannot spoof their address.
+ */
+define('SENDZERO_CLIENT_IP_HEADER', (string)sz_config_value('client_ip_header', ''));
+
+/* Disk emergency-stop thresholds for NEW uploads. */
+define('SENDZERO_NODE_WARN_DISK_USED_PERCENT', (float)sz_config_value('warn_disk_used_percent', 90.0));
+define('SENDZERO_NODE_MAX_DISK_USED_PERCENT', (float)sz_config_value('max_disk_used_percent', 95.0));
+
 $GLOBALS['SENDZERO_TTLS'] = array(
     3600,
     86400,
