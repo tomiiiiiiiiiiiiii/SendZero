@@ -41,6 +41,24 @@ max_execution_time = 120
 
 The PHP build must be **64-bit** for correct 5 GiB integer handling. PHP 5.6+ is supported by the backend code.
 
+## Public-service abuse protection
+
+SendZero includes database-free application limits suitable for an anonymous public service.
+
+Default limits:
+
+- 30 new transfer allocations per client per hour;
+- 25 GiB of allocated transfer size per client per day;
+- 3 active uploads per client on each child node;
+- disk warning at 90% used;
+- automatic refusal of new uploads at 95% used.
+
+Raw IP addresses are not stored by the application limiter. The master derives a local HMAC client tag and stores only counters in `DATA_DIR/.ratelimit/`.
+
+When running behind a trusted reverse proxy, configure `client_ip_header` explicitly; otherwise SendZero uses `REMOTE_ADDR`.
+
+See [docs/PRODUCTION.md](docs/PRODUCTION.md) for production configuration and security-header details.
+
 ## Terms and acceptable use
 
 The public interface includes `terms.html`, a basic Terms of Use / Acceptable Use Policy covering prohibited content and abusive use.
@@ -171,6 +189,12 @@ See [docs/MULTI_SERVER.md](docs/MULTI_SERVER.md) for deployment examples for:
 - independent `s1`, `s2`, `s3` child nodes;
 - adding capacity when disk space or network capacity becomes constrained.
 
+## Production test
+
+Before advertising the 5 GiB limit publicly, run the full deployed HTTPS checklist in [docs/TESTING.md](docs/TESTING.md).
+
+It covers full and interrupted 5 GiB upload/download, resume, SHA-256 verification, one-time deletion, abuse limits, disk emergency stop and response headers.
+
 ## Cleanup
 
 Run periodically:
@@ -185,8 +209,9 @@ Incomplete uploads automatically expire after 6 hours.
 
 - Move `DATA_DIR` outside the public web root if possible.
 - Use HTTPS only.
-- Add rate limiting and per-IP / per-transfer quotas before public launch.
-- Consider free-space checks before accepting a transfer.
+- The included `.htaccess` sets a restrictive Content Security Policy, HSTS, no-referrer policy, anti-framing and Permissions-Policy headers for Apache.
+- Keep the built-in application rate limits enabled for anonymous public traffic.
+- Keep the disk warning/emergency-stop thresholds enabled on every child node.
 - Set web-server request/body limits above the 8 MiB chunk size.
 - Resumable uploads and File System Access downloads are supported.
 - Consider adding an explicit transfer manager UI for listing, cancelling and clearing interrupted transfers.
