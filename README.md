@@ -22,7 +22,7 @@ The project is currently in **pre-public testing**. The 5 GiB transfer path is i
 - multi-server storage without MySQL, Redis or shared filesystems;
 - direct browser-to-node upload and download;
 - multi-node administration CLI;
-- Terms of Use, Privacy Policy and dedicated abuse contact;
+- multilingual FAQ, Terms of Use, Privacy Policy and dedicated abuse contact;
 - production preflight checker;
 - GitHub Actions syntax checks for **PHP 5.6, PHP 8.2 and JavaScript**.
 
@@ -260,19 +260,22 @@ Public abuse reports can be sent to:
 abuse@sendzero.link
 ```
 
-## Terms and privacy
+## FAQ, terms and privacy
 
 The public interface includes:
 
+- [FAQ](faq.html) for common sender/recipient questions;
 - [Terms of Use / Acceptable Use Policy](terms.html);
 - [Privacy Policy](privacy.html);
 - abuse contact: `abuse@sendzero.link`.
 
-Both legal pages support:
+These public information pages support:
 
 - English;
 - German;
 - Polish.
+
+The FAQ uses native HTML `<details>` sections and does not require an additional JavaScript library.
 
 ## Requirements
 
@@ -432,6 +435,7 @@ SendZero/
 ├── download.html
 ├── terms.html
 ├── privacy.html
+├── faq.html
 ├── sw.js
 ├── config.php
 ├── config.local.example.php
@@ -481,6 +485,7 @@ Production storage should normally use a configured `DATA_DIR` outside this repo
 - [Production hardening](docs/PRODUCTION.md)
 - [Production test checklist](docs/TESTING.md)
 - [Abuse administration](docs/ADMIN.md)
+- [FAQ](faq.html)
 - [Terms of Use](terms.html)
 - [Privacy Policy](privacy.html)
 
