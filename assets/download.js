@@ -261,7 +261,7 @@
       }
 
       const stored = await getDownloadState(id);
-      if (stateMatchesTransfer(stored) && stored.next_index > 0) {
+      if (stateMatchesTransfer(stored)) {
         resumeState = stored;
 
         const pct = Math.floor((stored.next_index / remoteInfo.chunk_count) * 100);
@@ -271,7 +271,7 @@
         downloadBtn.textContent = 'Resume download';
         fileMeta.textContent =
           formatBytes(manifest.size) + ' · ' + pct + '% already saved · next chunk ' +
-          (stored.next_index + 1) + '/' + remoteInfo.chunk_count;
+          Math.min(stored.next_index + 1, remoteInfo.chunk_count) + '/' + remoteInfo.chunk_count;
       } else {
         if (stored) await deleteDownloadState(id);
         resumeState = null;
@@ -697,7 +697,7 @@
         status.textContent =
           err.message + ' The saved resume state was cleared; start the download again.';
         downloadBtn.textContent = 'Start download again';
-      } else if (sink && sink.resumable && resumeState && resumeState.next_index > 0) {
+      } else if (sink && sink.resumable && resumeState) {
         const pct = Math.floor((resumeState.next_index / remoteInfo.chunk_count) * 100);
         status.textContent =
           'Download paused at ' + pct + '%. Open this link again and choose Resume download.';
