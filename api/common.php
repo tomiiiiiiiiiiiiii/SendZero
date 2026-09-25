@@ -278,6 +278,220 @@ function sz_read_request_value($name, $default) {
 }
 
 
+/* ---------- download sessions / egress protection ---------- */
+
+function sz_download_sessions_dir($id) {
+    return sz_transfer_dir($id) . '/.download_sessions';
+}
+
+function sz_download_session_path($id, $token) {
+    return sz_download_sessions_dir($id) . '/' . hash('sha256', $token) . '.json';
+}
+
+function sz_download_session_start($id, $resumeToken) {
+    if (!sz_valid_id($id)) {
+        return array('ok' => false, 'error' => 'invalid_id');
+    }
+
+    $dir = sz_download_sessions_dir($id);
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+        return array('ok' => false, 'error' => 'download_session_unavailable');
+    }
+
+    $lock = @fopen($dir . '/.lock', 'c+');
+    if (!$lock || !@flock($lock, LOCK_EX)) {
+        if ($lock) {
+            fclose($lock);
+        }
+        return array('ok' => false, 'error' => 'download_session_busy');
+    }
+
+    $now = time();
+    $active = 0;
+    $items = @scandir($dir);
+
+    if (is_array($items)) {
+        foreach ($items as $name) {
+            if (!preg_match('/^[a-f0-9]{64}\.json$/', $name)) {
+                continue;
+            }
+
+            $path = $dir . '/' . $name;
+            $state = json_decode((string)@file_get_contents($path), true);
+
+            if (!is_array($state) || !isset($state['expires_at']) || (int)$state['expires_at'] <= $now) {
+                @unlink($path);
+                continue;
+            }
+
+            $active++;
+        }
+    }
+
+    if (sz_valid_token($resumeToken)) {
+        $resumePath = sz_download_session_path($id, $resumeToken);
+
+        if (is_file($resumePath)) {
+            $state = json_decode((string)@file_get_contents($resumePath), true);
+
+            if (is_array($state) && isset($state['expires_at']) && (int)$state['expires_at'] > $now) {
+                $state['expires_at'] = $now + DOWNLOAD_SESSION_TTL;
+                $state['updated_at'] = $now;
+                @file_put_contents($resumePath, json_encode($state), LOCK_EX);
+                @chmod($resumePath, 0600);
+
+                @flock($lock, LOCK_UN);
+                fclose($lock);
+
+                return array(
+                    'ok' => true,
+                    'token' => $resumeToken,
+                    'resumed' => true
+                );
+            }
+        }
+    }
+
+    if (
+        SENDZERO_NODE_MAX_ACTIVE_DOWNLOADS_PER_TRANSFER > 0 &&
+        $active >= SENDZERO_NODE_MAX_ACTIVE_DOWNLOADS_PER_TRANSFER
+    ) {
+        @flock($lock, LOCK_UN);
+        fclose($lock);
+
+        return array(
+            'ok' => false,
+            'error' => 'too_many_active_downloads'
+        );
+    }
+
+    try {
+        $token = sz_random_hex(32);
+    } catch (Exception $e) {
+        @flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => false, 'error' => 'server_random_unavailable');
+    }
+
+    $path = sz_download_session_path($id, $token);
+    $state = array(
+        'created_at' => $now,
+        'updated_at' => $now,
+        'expires_at' => $now + DOWNLOAD_SESSION_TTL
+    );
+
+    if (@file_put_contents($path, json_encode($state), LOCK_EX) === false) {
+        @flock($lock, LOCK_UN);
+        fclose($lock);
+        return array('ok' => false, 'error' => 'download_session_unavailable');
+    }
+
+    @chmod($path, 0600);
+    @flock($lock, LOCK_UN);
+    fclose($lock);
+
+    return array(
+        'ok' => true,
+        'token' => $token,
+        'resumed' => false
+    );
+}
+
+function sz_download_session_valid($id, $token) {
+    if (!sz_valid_id($id) || !sz_valid_token($token)) {
+        return false;
+    }
+
+    $path = sz_download_session_path($id, $token);
+    if (!is_file($path)) {
+        return false;
+    }
+
+    $state = json_decode((string)@file_get_contents($path), true);
+    if (!is_array($state) || !isset($state['expires_at'])) {
+        return false;
+    }
+
+    if ((int)$state['expires_at'] <= time()) {
+        @unlink($path);
+        return false;
+    }
+
+    return true;
+}
+
+function sz_download_session_release($id, $token) {
+    if (!sz_valid_id($id) || !sz_valid_token($token)) {
+        return;
+    }
+
+    @unlink(sz_download_session_path($id, $token));
+}
+
+function sz_check_transfer_download_token($id, $meta, $token) {
+    if (!empty($meta['once'])) {
+        return sz_check_download_token($meta, $token);
+    }
+
+    return sz_download_session_valid($id, $token);
+}
+
+function sz_download_egress_limit($meta) {
+    if (SENDZERO_DOWNLOAD_EGRESS_MULTIPLIER <= 0) {
+        return 0;
+    }
+
+    $fileSize = isset($meta['file_size']) ? (float)$meta['file_size'] : 0;
+    return max(
+        SENDZERO_DOWNLOAD_MIN_EGRESS_BYTES,
+        $fileSize * SENDZERO_DOWNLOAD_EGRESS_MULTIPLIER
+    );
+}
+
+function sz_download_egress_consume($id, $meta, $bytes) {
+    $limit = sz_download_egress_limit($meta);
+    if ($limit <= 0) {
+        return true;
+    }
+
+    $path = sz_transfer_dir($id) . '/egress.json';
+    $fh = @fopen($path, 'c+');
+
+    if (!$fh || !@flock($fh, LOCK_EX)) {
+        if ($fh) {
+            fclose($fh);
+        }
+        return false;
+    }
+
+    rewind($fh);
+    $state = json_decode(stream_get_contents($fh), true);
+    if (!is_array($state)) {
+        $state = array();
+    }
+
+    $used = isset($state['bytes']) ? (float)$state['bytes'] : 0;
+    if ($used + (float)$bytes > $limit) {
+        @flock($fh, LOCK_UN);
+        fclose($fh);
+        return false;
+    }
+
+    $state['bytes'] = $used + (float)$bytes;
+    $state['updated_at'] = time();
+
+    ftruncate($fh, 0);
+    rewind($fh);
+    fwrite($fh, json_encode($state));
+    fflush($fh);
+    @flock($fh, LOCK_UN);
+    fclose($fh);
+    @chmod($path, 0600);
+
+    return true;
+}
+
+
 /* ---------- client identity / file-based anti-abuse ---------- */
 
 function sz_client_ip() {
