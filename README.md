@@ -2,9 +2,11 @@
 
 **Private, zero-access file sharing with client-side encryption, resumable transfers and database-free multi-server storage.**
 
+**Live demo:** [https://sendzero.link/](https://sendzero.link/)
+
 SendZero encrypts files in the browser before upload. The server stores encrypted manifests and encrypted chunks, while the decryption key remains in the URL fragment after `#` and is not sent to PHP.
 
-The core transfer path is **production-tested on the deployed HTTPS instance at `sendzero.link`**. Validation includes a full **5 GiB end-to-end transfer with matching SHA-256**, interrupted upload and download resume, one-time deletion, sender revoke, Recent transfers recovery, cleanup/expiry, abuse and egress limits, disk emergency-stop behavior, admin CLI operations, security headers, and a long-running download session. The full Git history is also checked automatically for accidentally committed credentials and private runtime/configuration files. SendZero is ready for public source release, while remaining under active development. This validation is operational testing and automated release hygiene, not an independent security audit.
+The core transfer path is **production-tested on the deployed HTTPS instance at [sendzero.link](https://sendzero.link/)**. Validation includes a full **5 GiB end-to-end transfer with matching SHA-256**, interrupted upload and download resume, one-time deletion, sender revoke, Recent transfers recovery, cleanup/expiry, abuse and egress limits, disk emergency-stop behavior, admin CLI operations, security headers, and a long-running download session. The full Git history is also checked automatically for accidentally committed credentials and private runtime/configuration files. The source repository is public and remains under active development. This validation is operational testing and automated release hygiene, not an independent security audit.
 
 ## Highlights
 
@@ -565,7 +567,7 @@ Verified on the deployed HTTPS instance:
 - deployment security headers;
 - long-running download session behavior.
 
-The deployed core has been validated, the repository history audit passes, and the source tree is prepared for public release. Further work is primarily ongoing hardening, documentation and normal project maintenance rather than unverified core transfer functionality.
+The deployed core has been validated, the repository history audit passes, and the source code is publicly available under AGPL-3.0-only. Further work is primarily ongoing hardening, documentation and normal project maintenance rather than unverified core transfer functionality.
 
 ## License
 
