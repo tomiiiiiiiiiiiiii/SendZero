@@ -136,8 +136,9 @@
       trust_encrypt_desc: 'AES-256-GCM via Web Crypto. Up to 5 GiB.',
       trust_account_title: 'No account',
       trust_account_desc: 'No sign-up is required.',
-      trust_key_title: 'No key on server',
-      trust_key_desc: 'The URL fragment never reaches PHP.',
+      trust_key_title: 'Key stays with you',
+      trust_key_desc: 'The decryption key stays in the share link and is never uploaded.',
+      github_link: 'GitHub',
       footer_private: 'Private file sharing',
 
       download_eyebrow: 'PRIVATE TRANSFER',
@@ -560,8 +561,9 @@
       trust_encrypt_desc: 'AES-256-GCM przez Web Crypto. Do 5 GiB.',
       trust_account_title: 'Bez konta',
       trust_account_desc: 'Rejestracja nie jest wymagana.',
-      trust_key_title: 'Brak klucza na serwerze',
-      trust_key_desc: 'Fragment adresu URL nigdy nie trafia do PHP.',
+      trust_key_title: 'Klucz zostaje u Ciebie',
+      trust_key_desc: 'Klucz deszyfrujący pozostaje w linku i nigdy nie jest wysyłany na serwer.',
+      github_link: 'GitHub',
       footer_private: 'Prywatne wysyłanie plików',
 
       download_eyebrow: 'PRYWATNY TRANSFER',
