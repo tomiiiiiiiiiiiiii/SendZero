@@ -213,6 +213,28 @@
     return data;
   }
 
+  function apiUrl(base, path) {
+    if (!base) return path;
+    return new URL(path, String(base).replace(/\/+$/, '') + '/').toString();
+  }
+
+  async function resolveNode(nodeId) {
+    const response = await fetch('api/node.php?n=' + encodeURIComponent(nodeId), {
+      cache: 'no-store'
+    });
+
+    let data = null;
+    try { data = await response.json(); } catch (e) {}
+
+    if (!response.ok || !data || !data.ok) {
+      const err = new Error((data && data.error) || ('HTTP ' + response.status));
+      err.status = response.status;
+      throw err;
+    }
+
+    return data;
+  }
+
   async function uploadWithRetry(url, values, blob, attempts = 3) {
     let lastError = null;
 
@@ -276,16 +298,25 @@
   }
 
   async function createNewSession() {
-    const init = await postForm('api/init.php', {
+    const allocation = await postForm('api/allocate.php', {
       file_size: selectedFile.size,
       ttl: ttl.value,
       once: once.checked ? '1' : '0'
+    });
+
+    const init = await postForm(apiUrl(allocation.api_base, 'api/init.php'), {
+      file_size: selectedFile.size,
+      ttl: ttl.value,
+      once: once.checked ? '1' : '0',
+      allocation: allocation.allocation_token
     });
 
     const keyBytes = crypto.getRandomValues(new Uint8Array(32));
 
     const session = {
       id: init.id,
+      node_id: allocation.node_id,
+      api_base: allocation.api_base || '',
       upload_token: init.upload_token,
       key: base64Url(keyBytes),
       chunk_size: init.chunk_size,
@@ -309,7 +340,12 @@
 
   async function resumeExistingSession(session) {
     try {
-      const state = await postForm('api/resume.php', {
+      const nodeId = session.node_id || 'local';
+      const resolved = await resolveNode(nodeId);
+      session.node_id = resolved.node_id;
+      session.api_base = resolved.api_base || '';
+
+      const state = await postForm(apiUrl(session.api_base, 'api/resume.php'), {
         id: session.id,
         token: session.upload_token
       });
@@ -399,7 +435,7 @@
 
       if (!context.manifestUploaded) {
         const manifest = await encryptManifest(key, selectedFile, session.chunk_size, session.chunk_count);
-        await uploadWithRetry('api/manifest_upload.php', {
+        await uploadWithRetry(apiUrl(session.api_base, 'api/manifest_upload.php'), {
           id: session.id,
           token: session.upload_token
         }, manifest);
@@ -415,7 +451,7 @@
         const plainBuffer = await selectedFile.slice(start, end).arrayBuffer();
         const encryptedChunk = await encryptChunk(key, index, plainBuffer);
 
-        await uploadWithRetry('api/chunk.php', {
+        await uploadWithRetry(apiUrl(session.api_base, 'api/chunk.php'), {
           id: session.id,
           token: session.upload_token,
           index
@@ -436,7 +472,7 @@
 
       status.textContent = t('finalizing_transfer');
 
-      const complete = await postForm('api/complete.php', {
+      const complete = await postForm(apiUrl(session.api_base, 'api/complete.php'), {
         id: session.id,
         token: session.upload_token
       });
@@ -444,7 +480,9 @@
       progressBar.style.width = '100%';
 
       const base = new URL('download.html', window.location.href);
-      base.search = '?id=' + encodeURIComponent(session.id);
+      base.search =
+        '?n=' + encodeURIComponent(session.node_id) +
+        '&id=' + encodeURIComponent(session.id);
       base.hash = 'k=' + session.key;
       shareUrl.value = base.toString();
 
