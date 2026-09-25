@@ -50,6 +50,7 @@ function sz_handle_options() {
 
 sz_apply_cors_headers();
 sz_handle_options();
+sz_reject_oversized_post();
 
 function sz_random_hex($bytes) {
     if (function_exists('random_bytes')) {
@@ -69,6 +70,91 @@ function sz_random_hex($bytes) {
 
 function sz_valid_id($id) {
     return is_string($id) && preg_match('/^[a-f0-9]{32}$/', $id);
+}
+
+
+function sz_ini_bytes($value) {
+    $value = trim((string)$value);
+
+    if ($value === '') {
+        return 0;
+    }
+
+    $last = strtolower(substr($value, -1));
+    $number = (float)$value;
+
+    switch ($last) {
+        case 'g':
+            $number *= 1024;
+        case 'm':
+            $number *= 1024;
+        case 'k':
+            $number *= 1024;
+    }
+
+    return (float)$number;
+}
+
+function sz_php_upload_limits() {
+    $uploadRaw = (string)ini_get('upload_max_filesize');
+    $postRaw = (string)ini_get('post_max_size');
+
+    $uploadBytes = sz_ini_bytes($uploadRaw);
+    $postBytes = sz_ini_bytes($postRaw);
+
+    /*
+     * post_max_size needs room for multipart/form-data fields and boundaries
+     * in addition to the encrypted 8 MiB chunk itself.
+     */
+    $requiredUpload = (float)MAX_CHUNK_UPLOAD_BYTES;
+    $requiredPost = (float)MAX_CHUNK_UPLOAD_BYTES + 65536;
+
+    return array(
+        'upload_max_filesize' => $uploadRaw,
+        'post_max_size' => $postRaw,
+        'upload_max_bytes' => $uploadBytes,
+        'post_max_bytes' => $postBytes,
+        'required_upload_bytes' => $requiredUpload,
+        'required_post_bytes' => $requiredPost,
+        'upload_ok' => $uploadBytes == 0 || $uploadBytes >= $requiredUpload,
+        'post_ok' => $postBytes == 0 || $postBytes >= $requiredPost
+    );
+}
+
+function sz_reject_oversized_post() {
+    if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
+        return;
+    }
+
+    $contentLength = isset($_SERVER['CONTENT_LENGTH'])
+        ? (float)$_SERVER['CONTENT_LENGTH']
+        : 0;
+
+    if ($contentLength <= 0) {
+        return;
+    }
+
+    $limits = sz_php_upload_limits();
+    $postBytes = isset($limits['post_max_bytes'])
+        ? (float)$limits['post_max_bytes']
+        : 0;
+
+    /*
+     * When post_max_size is exceeded PHP can empty both $_POST and $_FILES.
+     * Detect that before endpoint validation turns the symptom into invalid_id.
+     */
+    if (
+        $postBytes > 0 &&
+        $contentLength > $postBytes &&
+        empty($_POST) &&
+        empty($_FILES)
+    ) {
+        sz_json(array(
+            'ok' => false,
+            'error' => 'request_too_large',
+            'limit' => 'post_max_size'
+        ), 413);
+    }
 }
 
 function sz_valid_token($token) {
@@ -989,6 +1075,7 @@ function sz_local_node_status() {
         'disk_warning' => $diskWarning,
         'disk_stop_percent' => SENDZERO_NODE_MAX_DISK_USED_PERCENT,
         'load_1m' => $load,
+        'php_upload_limits' => sz_php_upload_limits(),
         'time' => time()
     );
 }
