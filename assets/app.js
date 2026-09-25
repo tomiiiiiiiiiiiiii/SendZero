@@ -315,7 +315,6 @@
 
   async function createNewSession() {
     let lastError = null;
-    const allocationRequestId = hex(crypto.getRandomValues(new Uint8Array(16)));
 
     /*
      * Allocation and init are intentionally separate. If a node disappears
@@ -327,8 +326,7 @@
         const allocation = await postForm('api/allocate.php', {
           file_size: selectedFile.size,
           ttl: ttl.value,
-          once: once.checked ? '1' : '0',
-          request_id: allocationRequestId
+          once: once.checked ? '1' : '0'
         });
 
         const init = await postForm(apiUrl(allocation.api_base, 'api/init.php'), {
