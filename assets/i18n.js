@@ -172,6 +172,8 @@
       error_node_insufficient_space: 'Storage is temporarily full. Try again later.',
       error_no_storage_node: 'No storage node is currently available. Try again shortly.',
       error_service_busy: 'The service is temporarily busy. Try again shortly.',
+      error_request_too_large: 'The server upload limit is too low for SendZero chunks. Administrator: set upload_max_filesize to at least 10M and post_max_size to at least 11M.',
+      error_upload_failed: 'The server could not accept the uploaded chunk. Please try again.',
       error_too_many_active_downloads: 'Too many people are downloading this transfer right now. Try again later.',
       download_limit_reached: 'This transfer has reached its download traffic limit.',
 
@@ -382,6 +384,8 @@
       error_node_insufficient_space: 'Der Speicher ist vorübergehend voll. Bitte später erneut versuchen.',
       error_no_storage_node: 'Derzeit ist kein Speicherknoten verfügbar. Bitte in Kürze erneut versuchen.',
       error_service_busy: 'Der Dienst ist vorübergehend ausgelastet. Bitte in Kürze erneut versuchen.',
+      error_request_too_large: 'Das Server-Upload-Limit ist für SendZero-Chunks zu niedrig. Administrator: upload_max_filesize auf mindestens 10M und post_max_size auf mindestens 11M setzen.',
+      error_upload_failed: 'Der Server konnte den hochgeladenen Chunk nicht annehmen. Bitte erneut versuchen.',
       error_too_many_active_downloads: 'Zu viele Personen laden diesen Transfer gerade herunter. Bitte später erneut versuchen.',
       download_limit_reached: 'Dieser Transfer hat sein Download-Traffic-Limit erreicht.',
 
@@ -592,6 +596,8 @@
       error_node_insufficient_space: 'Pamięć serwera jest chwilowo pełna. Spróbuj ponownie później.',
       error_no_storage_node: 'Żaden serwer plików nie jest obecnie dostępny. Spróbuj ponownie za chwilę.',
       error_service_busy: 'Usługa jest chwilowo przeciążona. Spróbuj ponownie za chwilę.',
+      error_request_too_large: 'Limit uploadu na serwerze jest za niski dla fragmentów SendZero. Administrator: ustaw upload_max_filesize na co najmniej 10M oraz post_max_size na co najmniej 11M.',
+      error_upload_failed: 'Serwer nie mógł przyjąć wysyłanego fragmentu. Spróbuj ponownie.',
       error_too_many_active_downloads: 'Zbyt wiele osób pobiera teraz ten transfer. Spróbuj ponownie później.',
       download_limit_reached: 'Ten transfer osiągnął limit ruchu pobierania.',
 
