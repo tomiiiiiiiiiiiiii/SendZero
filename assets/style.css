@@ -444,7 +444,6 @@ footer {
   justify-content: space-between;
   gap: 12px;
   padding-top: 18px;
-  border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12px;
 }
