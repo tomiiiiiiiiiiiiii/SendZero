@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/common.php';
 
+sz_require_role('node');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     sz_json(array('ok' => false, 'error' => 'method_not_allowed'), 405);
 }
