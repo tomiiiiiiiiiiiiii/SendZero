@@ -4,7 +4,7 @@
 
 SendZero encrypts files in the browser before upload. The server stores encrypted manifests and encrypted chunks, while the decryption key remains in the URL fragment after `#` and is not sent to PHP.
 
-The project is currently in **pre-public testing**. The deployed HTTPS instance at `sendzero.link` has successfully completed normal upload/download tests, a full **5 GiB end-to-end transfer with matching SHA-256**, interrupted upload and download resume tests, one-time deletion, and sender revoke. Remaining operational and abuse-resistance checks are tracked in [docs/TESTING.md](docs/TESTING.md).
+The core transfer path is now **production-tested on the deployed HTTPS instance at `sendzero.link`**. Validation includes a full **5 GiB end-to-end transfer with matching SHA-256**, interrupted upload and download resume, one-time deletion, sender revoke, Recent transfers recovery, cleanup/expiry, abuse and egress limits, disk emergency-stop behavior, admin CLI operations, security headers, and a long-running download session. The repository remains under active development; this validation is operational testing, not an independent security audit.
 
 ## Highlights
 
@@ -379,30 +379,27 @@ The checker validates:
 
 A hard configuration error returns a non-zero exit code.
 
-## Pre-public testing
+## Deployment validation
 
-The following checks have been verified on the deployed HTTPS instance at `sendzero.link`:
+The current deployed HTTPS instance at `sendzero.link` has completed the application and operational checks in the production test plan, including:
 
 - normal upload and download;
-- full 5 GiB upload;
-- full 5 GiB download;
+- full 5 GiB upload and download;
 - SHA-256 equality between the original and downloaded 5 GiB file;
 - interrupted upload + resume;
 - interrupted download + resume;
 - one-time deletion;
 - sender revoke;
-- required security headers via the deployment preflight.
-
-Still to verify before treating the public deployment as fully tested:
-
 - Recent transfers revoke after page reload;
 - upload abuse limits;
-- download abuse limits;
-- disk emergency stop;
-- admin CLI deletion;
-- expiry cleanup behavior and scheduled cleanup execution.
+- download concurrency and egress limits;
+- disk emergency stop for new uploads;
+- expiry cleanup and scheduled cleanup execution;
+- admin CLI status, info and deletion operations;
+- required security headers via the deployment preflight;
+- long-running download behavior beyond the normal session TTL boundary.
 
-The complete procedure remains in [docs/TESTING.md](docs/TESTING.md).
+The reproducible test procedure remains in [docs/TESTING.md](docs/TESTING.md).
 
 A completed transfer with a different SHA-256 hash is a release blocker.
 
@@ -496,40 +493,40 @@ Production storage should normally use a configured `DATA_DIR` outside this repo
 
 ## Current status
 
-SendZero is still under active development and the repository remains private while pre-public testing is completed.
+SendZero is under active development, but its core transfer and operational paths have been validated on the deployed HTTPS instance at `sendzero.link`.
 
 Implemented:
 
-- client-side encryption;
+- client-side AES-256-GCM encryption;
 - 5 GiB chunked transfer path;
 - upload/download resume;
 - multi-node routing;
-- abuse protection;
-- sender revoke;
+- abuse and egress protection;
+- sender revoke and Recent transfers;
+- expiry cleanup;
+- disk emergency-stop behavior;
 - admin tooling;
-- preflight;
+- deployment preflight;
 - multilingual public/legal UI;
 - automated syntax CI.
 
 Verified on the deployed HTTPS instance:
 
 - normal upload/download;
-- 5 GiB end-to-end transfer;
-- matching SHA-256 after download;
-- upload resume;
-- download resume;
+- 5 GiB end-to-end transfer with matching SHA-256;
+- upload and download resume;
 - one-time deletion;
 - sender revoke;
-- deployment security headers.
+- Recent transfers after reload;
+- cleanup and expiry behavior;
+- upload abuse limits;
+- download concurrency and egress limits;
+- disk emergency stop;
+- admin CLI operations;
+- deployment security headers;
+- long-running download session behavior.
 
-The deployment preflight has also been run successfully, with operational warnings still requiring review.
-
-Still required before public launch:
-
-- confirm cleanup scheduling and expiry cleanup behavior;
-- complete the remaining abuse-limit and disk-emergency tests;
-- test admin CLI operations on the deployed node;
-- complete the remaining items in the production test checklist.
+The repository remains private while the project is being prepared for public release. Further work is now primarily deployment hardening, documentation and release preparation rather than unverified core transfer functionality.
 
 ## License
 
