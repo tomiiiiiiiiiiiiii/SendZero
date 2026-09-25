@@ -340,7 +340,7 @@ function sz_client_tag() {
     return substr(hash_hmac('sha256', sz_client_ip(), $secret), 0, 32);
 }
 
-function sz_rate_limit_consume($fileSize, $clientTag, $requestId, $commit) {
+function sz_rate_limit_consume($fileSize, $clientTag, $commit) {
     if (!SENDZERO_RATE_LIMIT_ENABLED) {
         return array('ok' => true, 'retry_after' => 0);
     }
@@ -348,9 +348,6 @@ function sz_rate_limit_consume($fileSize, $clientTag, $requestId, $commit) {
     if (!preg_match('/^[a-f0-9]{32}$/', $clientTag)) {
         return array('ok' => false, 'error' => 'rate_limit_identity_failed', 'retry_after' => 60);
     }
-
-    $validRequestId = is_string($requestId) &&
-        preg_match('/^[a-f0-9]{32}$/', $requestId);
 
     $dir = DATA_DIR . '/.ratelimit';
     if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
@@ -388,26 +385,6 @@ function sz_rate_limit_consume($fileSize, $clientTag, $requestId, $commit) {
         $state['day_bytes'] = 0;
     }
 
-    if (!isset($state['recent_requests']) || !is_array($state['recent_requests'])) {
-        $state['recent_requests'] = array();
-    }
-
-    foreach ($state['recent_requests'] as $id => $timestamp) {
-        if (!preg_match('/^[a-f0-9]{32}$/', (string)$id) || (int)$timestamp < $now - 600) {
-            unset($state['recent_requests'][$id]);
-        }
-    }
-
-    /*
-     * Browser retries use the same request ID. Do not charge the hourly or
-     * daily quota again when a child disappeared between allocation and init.
-     */
-    if ($validRequestId && isset($state['recent_requests'][$requestId])) {
-        @flock($fh, LOCK_UN);
-        fclose($fh);
-        return array('ok' => true, 'retry_after' => 0, 'duplicate' => true);
-    }
-
     $hourCount = isset($state['hour_count']) ? (int)$state['hour_count'] : 0;
     $dayBytes = isset($state['day_bytes']) ? (float)$state['day_bytes'] : 0;
 
@@ -442,16 +419,12 @@ function sz_rate_limit_consume($fileSize, $clientTag, $requestId, $commit) {
     if (!$commit) {
         @flock($fh, LOCK_UN);
         fclose($fh);
-        return array('ok' => true, 'retry_after' => 0, 'duplicate' => false);
+        return array('ok' => true, 'retry_after' => 0);
     }
 
     $state['hour_count'] = $hourCount + 1;
     $state['day_bytes'] = $dayBytes + (float)$fileSize;
     $state['updated_at'] = $now;
-
-    if ($validRequestId) {
-        $state['recent_requests'][$requestId] = $now;
-    }
 
     ftruncate($fh, 0);
     rewind($fh);
@@ -461,7 +434,7 @@ function sz_rate_limit_consume($fileSize, $clientTag, $requestId, $commit) {
     fclose($fh);
     @chmod($path, 0600);
 
-    return array('ok' => true, 'retry_after' => 0, 'duplicate' => false);
+    return array('ok' => true, 'retry_after' => 0);
 }
 
 function sz_active_uploads_path($clientTag) {
