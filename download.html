@@ -5,43 +5,57 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>Receive with SendZero</title>
+  <meta name="description" content="Encrypt in your browser. Share a link. The server never receives the decryption key.">
   <link rel="stylesheet" href="assets/style.css">
 </head>
-<body>
+<body data-page="download">
   <main class="shell receiveShell">
     <header class="topbar">
-      <a class="brand" href="./"><span class="brandMark">0</span><span>SendZero</span></a>
-      <span class="pill">encrypted transfer</span>
+      <a class="brand" href="./" data-i18n-aria="home_aria" aria-label="SendZero home">
+        <span class="brandMark">0</span>
+        <span>SendZero</span>
+      </a>
+
+      <div class="topActions">
+        <span class="pill" data-i18n="pill_download">encrypted transfer</span>
+        <div class="languageSwitcher" aria-label="Language">
+          <button type="button" data-lang="en">EN</button>
+          <button type="button" data-lang="de">DE</button>
+          <button type="button" data-lang="pl">PL</button>
+        </div>
+      </div>
     </header>
 
     <section class="card receiveCard">
-      <p class="eyebrow">PRIVATE TRANSFER</p>
-      <h1 id="title">Opening secure link…</h1>
-      <p class="lede small" id="description">Checking the encrypted payload.</p>
+      <p class="eyebrow" data-i18n="download_eyebrow">PRIVATE TRANSFER</p>
+      <h1 id="title" data-i18n="opening_link">Opening secure link…</h1>
+      <p class="lede small" id="description" data-i18n="checking_payload">Checking the encrypted payload.</p>
 
       <div class="filePanel hidden" id="filePanel">
         <div class="fileIcon">↓</div>
         <div>
-          <strong id="fileName">Encrypted file</strong>
+          <strong id="fileName" data-i18n="encrypted_file">Encrypted file</strong>
           <span id="fileMeta"></span>
         </div>
       </div>
 
-      <button class="primary hidden" id="downloadBtn">Decrypt & save</button>
+      <button class="primary hidden" id="downloadBtn" data-i18n="decrypt_save">Decrypt & save</button>
 
       <div class="progressWrap hidden" id="progressWrap">
         <div class="progress"><span id="progressBar"></span></div>
-        <p id="status">Downloading encrypted data…</p>
+        <p id="status" data-i18n="downloading_data">Downloading encrypted data…</p>
       </div>
 
       <div class="notice hidden" id="notice"></div>
     </section>
 
     <footer>
-      <span>The decryption key stays in this browser.</span>
+      <span>SendZero</span>
+      <span data-i18n="footer_private">Private file sharing</span>
     </footer>
   </main>
 
+  <script src="assets/i18n.js"></script>
   <script src="assets/download.js"></script>
 </body>
 </html>
