@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/common.php';
 
+sz_require_role('node');
+
 $id = isset($_GET['id']) ? strtolower($_GET['id']) : '';
 $meta = sz_require_ready_meta($id);
 
