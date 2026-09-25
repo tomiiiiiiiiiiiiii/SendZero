@@ -10,6 +10,8 @@ The current defaults are:
 new transfer allocations / client / hour : 30
 allocated bytes / client / day            : 25 GiB
 active uploads / client / child node      : 3
+active downloads / transfer / child node  : 8
+download egress allowance                 : 20x file size, min 5 GiB
 disk warning                              : 90% used
 stop NEW uploads                          : 95% used
 absolute minimum free space               : 10 GiB
@@ -26,6 +28,9 @@ return array(
     'rate_max_allocations_per_hour' => 30,
     'rate_max_bytes_per_day' => 25 * 1024 * 1024 * 1024,
     'max_active_uploads_per_client' => 3,
+    'max_active_downloads_per_transfer' => 8,
+    'download_egress_multiplier' => 20,
+    'download_min_egress_bytes' => 5 * 1024 * 1024 * 1024,
 
     'warn_disk_used_percent' => 90,
     'max_disk_used_percent' => 95,
@@ -180,3 +185,30 @@ It covers:
 - rate-limit tests;
 - disk emergency-stop tests;
 - security-header verification.
+
+
+## Sender revoke
+
+Each new transfer has a dedicated delete token. The node stores only its SHA-256 hash.
+
+The sender UI can call `api/delete.php` with the transfer ID and delete token to remove the encrypted transfer immediately. The delete token is separate from the recipient share URL and the AES decryption key.
+
+## Download abuse protection
+
+Ordinary downloads use short-lived session tokens created by `api/start.php`. This lets a node cap the number of simultaneous readers of one transfer without user accounts.
+
+Encrypted chunk responses also contribute to a per-transfer egress counter stored beside that transfer. When the configured allowance is exhausted, additional chunk requests receive HTTP 429.
+
+The defaults are deliberately generous for private sharing:
+
+```text
+8 simultaneous sessions
+20 full-file equivalents
+minimum 5 GiB allowance
+```
+
+Set `download_egress_multiplier` to `0` to disable the egress cap.
+
+## Abuse administration
+
+For multi-node abuse handling see `docs/ADMIN.md`. The master CLI can inspect and delete a transfer on a remote child node using signed HMAC requests.
