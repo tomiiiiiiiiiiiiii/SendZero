@@ -308,76 +308,189 @@ client_max_body_size 11M;
 
 ## Quick start
 
-### 1. Create local configuration
+This is the shortest path to a working **single-server installation** where one machine acts as both the master/UI and storage node `s1`.
+
+### 1. Clone SendZero
+
+```bash
+git clone https://github.com/tomiiiiiiiiiiiiii/SendZero.git
+cd SendZero
+```
+
+The repository is currently private, so GitHub authentication is required while it remains private.
+
+### 2. Create the local configuration
 
 ```bash
 cp config.local.example.php config.local.php
 ```
 
-Adjust at least:
+For a simple one-server setup, start with:
 
 ```php
+<?php
+
 return array(
     'role' => 'both',
     'node_id' => 's1',
-    'data_dir' => '/srv/sendzero-data'
+
+    // Keep encrypted transfer data outside the public web root.
+    'data_dir' => '/srv/sendzero-data',
+
+    'accept_uploads' => true,
+    'require_allocation' => true
 );
 ```
 
-### 2. Create storage outside the public web root
+When master and storage run on the same origin, `node_public_url` and `master_origin` can stay empty.
+
+### 3. Create the storage directory
 
 ```bash
-mkdir -p /srv/sendzero-data
-chown -R www-data:www-data /srv/sendzero-data
-chmod 700 /srv/sendzero-data
+sudo mkdir -p /srv/sendzero-data
+sudo chown -R www-data:www-data /srv/sendzero-data
+sudo chmod 700 /srv/sendzero-data
 ```
 
-Keeping `DATA_DIR` outside the application directory is strongly preferred for production.
+If your PHP/web-server user is not `www-data`, replace it with the correct account.
 
-### 3. Configure the web server
+Production storage should preferably stay **outside the public web root**.
 
-For Apache, the repository includes `.htaccess` rules for:
+### 4. Check PHP
 
-- directory listing protection;
-- sensitive PHP/config file blocking;
-- Content Security Policy;
-- HSTS;
-- no-referrer policy;
-- anti-framing;
-- MIME sniffing protection;
-- Permissions Policy.
+SendZero requires:
 
-For Nginx equivalents, see [docs/PRODUCTION.md](docs/PRODUCTION.md).
+- PHP 5.6 or newer;
+- a 64-bit PHP build;
+- a cryptographically secure random source;
+- write access to `DATA_DIR`.
 
-### 4. Schedule cleanup
+Quick check:
 
-Run on every storage node:
+```bash
+php -v
+php -r 'echo PHP_INT_SIZE, PHP_EOL;'
+```
+
+For 5 GiB support, the second command should print:
+
+```text
+8
+```
+
+### 5. Configure PHP upload limits
+
+SendZero sends one encrypted chunk per request, so PHP does **not** need a 5 GiB request limit.
+
+Suggested values:
+
+```ini
+upload_max_filesize = 10M
+post_max_size = 11M
+max_execution_time = 120
+```
+
+Restart PHP-FPM or Apache after changing `php.ini`.
+
+### 6. Configure the web server
+
+Point the site/document root at the SendZero repository directory and serve it over **HTTPS**.
+
+#### Apache
+
+Make sure `.htaccess` overrides are enabled for the SendZero directory, for example:
+
+```apache
+<Directory /var/www/SendZero>
+    AllowOverride All
+    Require all granted
+</Directory>
+```
+
+The repository `.htaccess` already provides the main security headers and blocks direct web access to sensitive local files.
+
+#### Nginx
+
+Set at least:
+
+```nginx
+client_max_body_size 11M;
+```
+
+Nginx does not read `.htaccess`, so copy the equivalent security-header rules from [docs/PRODUCTION.md](docs/PRODUCTION.md).
+
+### 7. Schedule cleanup
+
+Run cleanup on every storage node, for example every 10 minutes:
 
 ```cron
-*/10 * * * * /usr/bin/php /path/to/SendZero/cleanup.php >/dev/null 2>&1
+*/10 * * * * /usr/bin/php /var/www/SendZero/cleanup.php >/dev/null 2>&1
 ```
 
-Cleanup removes expired transfers and stale internal state.
+Use the real path to your installation.
 
-### 5. Run preflight
+Without cleanup, expired transfers and stale internal state will remain on disk longer than intended.
+
+### 8. Run the preflight checker
+
+After HTTPS is working:
 
 ```bash
 php sendzero-preflight.php https://sendzero.link
 ```
 
-The checker validates:
+For another hostname, replace the URL with your deployment URL.
 
-- PHP version;
-- 64-bit integer support;
-- secure randomness;
-- `DATA_DIR`;
-- disk capacity and emergency thresholds;
-- master/node configuration;
-- node secrets;
-- remote-node HTTP capability;
-- required HTTPS response headers.
+The desired result is:
 
-A hard configuration error returns a non-zero exit code.
+```text
+PRE-FLIGHT PASSED
+```
+
+`PASSED WITH WARNINGS` is acceptable only after reviewing the warnings. Fix every `FAIL` before continuing.
+
+### 9. Perform a small functional test
+
+Before trying 5 GiB:
+
+1. open the SendZero upload page;
+2. upload a small test file;
+3. copy the generated share link;
+4. open it in a private/incognito window;
+5. download and decrypt the file;
+6. test **Delete transfer now**;
+7. reload the sender page and verify **Recent transfers**;
+8. test a one-time transfer.
+
+### 10. Run the full production test
+
+Once the small test works, follow:
+
+[docs/TESTING.md](docs/TESTING.md)
+
+That checklist covers:
+
+- full 5 GiB upload;
+- interrupted upload + resume;
+- full download;
+- interrupted download + resume;
+- SHA-256 verification;
+- one-time deletion;
+- sender revoke;
+- upload/download abuse limits;
+- disk emergency stop;
+- admin CLI;
+- security headers.
+
+### Adding more storage nodes later
+
+You do not need MySQL, Redis or shared storage.
+
+When `s1` is no longer enough, add `s2`, `s3`, etc. using:
+
+[docs/MULTI_SERVER.md](docs/MULTI_SERVER.md)
+
+Existing transfers remain on the node where they were originally uploaded.
 
 ## Pre-public testing
 
