@@ -194,6 +194,20 @@
     }
   }
 
+  function apiErrorMessage(code) {
+    const keys = {
+      too_many_transfers: 'error_too_many_transfers',
+      daily_transfer_limit: 'error_daily_transfer_limit',
+      too_many_active_uploads: 'error_too_many_active_uploads',
+      node_insufficient_space: 'error_node_insufficient_space',
+      no_storage_node_available: 'error_no_storage_node',
+      rate_limit_unavailable: 'error_service_busy',
+      rate_limit_busy: 'error_service_busy'
+    };
+
+    return keys[code] ? t(keys[code]) : code;
+  }
+
   async function postForm(url, values, fileBlob) {
     const form = new FormData();
     Object.keys(values).forEach(key => form.append(key, String(values[key])));
@@ -204,9 +218,11 @@
     try { data = await response.json(); } catch (e) {}
 
     if (!response.ok || !data || !data.ok) {
-      const err = new Error((data && data.error) || ('HTTP ' + response.status));
+      const code = data && data.error ? data.error : null;
+      const err = new Error(code ? apiErrorMessage(code) : ('HTTP ' + response.status));
       err.status = response.status;
-      err.code = data && data.error ? data.error : null;
+      err.code = code;
+      err.retryAfter = data && data.retry_after ? Number(data.retry_after) : 0;
       throw err;
     }
 
@@ -349,6 +365,14 @@
         };
       } catch (err) {
         lastError = err;
+
+        /*
+         * Do not route around client-side abuse limits. Retry only failures
+         * where another node may genuinely help (5xx/network errors).
+         */
+        if (err && err.status >= 400 && err.status < 500) {
+          break;
+        }
 
         if (attempt + 1 < 3) {
           await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
