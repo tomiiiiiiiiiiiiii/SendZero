@@ -82,7 +82,7 @@ DATA_DIR/.active_uploads/
 
 `cleanup.php` removes stale state.
 
-Allocation retries use an idempotent random request ID, so a child-node failure during `init.php` does not charge the same upload against the daily byte quota multiple times.
+The limiter deliberately counts each newly issued allocation. This is conservative: a rare retry after a child failure can consume another allocation/byte allowance, but clients cannot replay a request identifier to obtain unmetered transfers.
 
 ## Disk emergency stop
 
