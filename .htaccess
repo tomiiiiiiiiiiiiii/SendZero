@@ -9,3 +9,14 @@ Options -Indexes
         Deny from all
     </IfModule>
 </FilesMatch>
+
+
+<FilesMatch "^(config(?:\.local)?\.php|nodes\.php|cleanup\.php)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order Allow,Deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
