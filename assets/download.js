@@ -2,6 +2,7 @@
   'use strict';
 
   const BLOB_FALLBACK_LIMIT = 512 * 1024 * 1024;
+  const t = (key, vars) => window.SendZeroI18n.t(key, vars);
   const RESUME_DB_NAME = 'sendzero';
   const RESUME_DB_VERSION = 1;
   const RESUME_STORE = 'downloads';
@@ -29,12 +30,12 @@
   let resumeState = null;
 
   function showError(message) {
-    title.textContent = 'This transfer cannot be opened';
+    title.textContent = t('transfer_cannot_open');
     description.textContent = message;
     filePanel.classList.add('hidden');
     downloadBtn.classList.add('hidden');
     progressWrap.classList.add('hidden');
-    notice.textContent = 'SendZero cannot recover a missing or incorrect decryption key.';
+    notice.textContent = t('cannot_recover_key');
     notice.classList.remove('hidden');
   }
 
@@ -216,18 +217,18 @@
 
   async function loadInfo() {
     if (!/^[a-f0-9]{32}$/.test(id)) {
-      showError('The transfer ID is invalid.');
+      showError(t('invalid_transfer_id'));
       return;
     }
 
     if (!encodedKey) {
-      showError('The decryption key is missing from the link.');
+      showError(t('missing_key'));
       return;
     }
 
     try {
       const keyBytes = decodeBase64Url(encodedKey);
-      if (keyBytes.length !== 32) throw new Error('Invalid decryption key');
+      if (keyBytes.length !== 32) throw new Error(t('invalid_key'));
 
       keyFingerprint = await fingerprintKey(keyBytes);
       cryptoKey = await crypto.subtle.importKey(
@@ -245,19 +246,19 @@
         if (infoResponse.status === 410 || infoResponse.status === 404) {
           await deleteDownloadState(id);
         }
-        if (infoResponse.status === 410) throw new Error('This transfer has expired.');
-        throw new Error('This transfer no longer exists.');
+        if (infoResponse.status === 410) throw new Error(t('expired_transfer'));
+        throw new Error(t('transfer_missing'));
       }
 
       remoteInfo = info;
 
       const manifestResponse = await fetch('api/manifest.php?id=' + encodeURIComponent(id), { cache: 'no-store' });
-      if (!manifestResponse.ok) throw new Error('The encrypted manifest is unavailable.');
+      if (!manifestResponse.ok) throw new Error(t('manifest_unavailable'));
 
       manifest = await decryptManifest(new Uint8Array(await manifestResponse.arrayBuffer()));
 
       if (manifest.size !== info.file_size || manifest.chunk_count !== info.chunk_count) {
-        throw new Error('Transfer metadata does not match.');
+        throw new Error(t('metadata_mismatch'));
       }
 
       const stored = await getDownloadState(id);
@@ -265,26 +266,30 @@
         resumeState = stored;
 
         const pct = Math.floor((stored.next_index / remoteInfo.chunk_count) * 100);
-        title.textContent = 'Interrupted download found';
-        description.textContent =
-          'SendZero can continue writing to the same local file from the last verified encrypted chunk.';
-        downloadBtn.textContent = 'Resume download';
-        fileMeta.textContent =
-          formatBytes(manifest.size) + ' · ' + pct + '% already saved · next chunk ' +
-          Math.min(stored.next_index + 1, remoteInfo.chunk_count) + '/' + remoteInfo.chunk_count;
+        title.textContent = t('interrupted_download_found');
+        description.textContent = t('can_continue_download');
+        downloadBtn.textContent = t('resume_download');
+        fileMeta.textContent = t('already_saved', {
+          size: formatBytes(manifest.size),
+          pct,
+          next: Math.min(stored.next_index + 1, remoteInfo.chunk_count),
+          total: remoteInfo.chunk_count
+        });
       } else {
         if (stored) await deleteDownloadState(id);
         resumeState = null;
 
-        title.textContent = 'Encrypted file ready';
+        title.textContent = t('encrypted_ready');
         description.textContent = info.once
-          ? 'This is a one-time transfer. The server copy is removed after a completed download.'
-          : 'The file will be decrypted chunk by chunk in this browser.';
+          ? t('one_time_ready_desc')
+          : t('chunk_decrypt_desc');
 
-        downloadBtn.textContent = 'Decrypt & save';
-        fileMeta.textContent =
-          formatBytes(manifest.size) + ' · ' + info.chunk_count + ' encrypted chunks · expires ' +
-          new Date(info.expires_at * 1000).toLocaleString();
+        downloadBtn.textContent = t('decrypt_save');
+        fileMeta.textContent = t('encrypted_meta', {
+          size: formatBytes(manifest.size),
+          total: info.chunk_count,
+          date: new Date(info.expires_at * 1000).toLocaleString()
+        });
       }
 
       fileName.textContent = manifest.name || 'download';
@@ -320,16 +325,14 @@
     if (handle) {
       const granted = await requestHandlePermission(handle);
       if (!granted) {
-        const err = new Error('Permission to the partial local file is required to resume.');
+        const err = new Error(t('permission_partial'));
         err.name = 'ResumePermissionError';
         throw err;
       }
 
       const partialFile = await handle.getFile();
       if (partialFile.size < state.bytes_written) {
-        const err = new Error(
-          'The partial local file is shorter than the last verified checkpoint.'
-        );
+        const err = new Error(t('partial_shorter'));
         err.name = 'ResumeFileMismatchError';
         throw err;
       }
@@ -434,7 +437,7 @@
     }, [channel.port2]);
 
     const prepared = await nextMessage();
-    if (prepared.type !== 'prepared') throw new Error('Streaming download could not be prepared.');
+    if (prepared.type !== 'prepared') throw new Error(t('streaming_prepare_failed'));
 
     return {
       kind: 'serviceworker',
@@ -447,7 +450,7 @@
         document.body.appendChild(iframe);
 
         const ready = await nextMessage();
-        if (ready.type !== 'ready') throw new Error('Streaming download did not start.');
+        if (ready.type !== 'ready') throw new Error(t('streaming_start_failed'));
         this.iframe = iframe;
       },
       async write(bytes) {
@@ -455,13 +458,13 @@
         port.postMessage({ type: 'chunk', data: buffer }, [buffer]);
 
         const ack = await nextMessage();
-        if (ack.type !== 'chunk-accepted') throw new Error('Streaming download interrupted.');
+        if (ack.type !== 'chunk-accepted') throw new Error(t('streaming_interrupted'));
       },
       async checkpoint() {},
       async close() {
         port.postMessage({ type: 'end' });
         const ack = await nextMessage();
-        if (ack.type !== 'closed') throw new Error('Streaming download did not close cleanly.');
+        if (ack.type !== 'closed') throw new Error(t('streaming_close_failed'));
 
         setTimeout(() => {
           if (this.iframe) this.iframe.remove();
@@ -530,16 +533,13 @@
     const blobSink = makeBlobSink();
     if (blobSink) return blobSink;
 
-    throw new Error(
-      'This browser cannot stream a file this large to disk. ' +
-      'Use a current browser with File System Access support.'
-    );
+    throw new Error(t('browser_large_unsupported'));
   }
 
   async function downloadAndDecrypt() {
     downloadBtn.disabled = true;
     progressWrap.classList.remove('hidden');
-    status.textContent = resumeState ? 'Reopening partial local file…' : 'Preparing local save…';
+    status.textContent = resumeState ? t('reopening_partial') : t('preparing_save');
 
     let sink = null;
     let downloadToken = '';
@@ -578,9 +578,11 @@
       if (startIndex > 0) {
         const pct = Math.max(1, Math.floor((startIndex / remoteInfo.chunk_count) * 100));
         progressBar.style.width = pct + '%';
-        status.textContent =
-          'Resuming download… ' + pct + '% · chunk ' +
-          (startIndex + 1) + '/' + remoteInfo.chunk_count;
+        status.textContent = t('resuming_download_progress', {
+          pct,
+          current: startIndex + 1,
+          total: remoteInfo.chunk_count
+        });
       } else {
         progressBar.style.width = '1%';
       }
@@ -611,7 +613,7 @@
         const response = await fetch(url.toString(), { cache: 'no-store' });
 
         if (!response.ok) {
-          const err = new Error('Chunk ' + (index + 1) + ' could not be downloaded.');
+          const err = new Error(t('chunk_download_failed', { current: index + 1 }));
           err.status = response.status;
           throw err;
         }
@@ -631,9 +633,12 @@
 
         const pct = Math.max(1, Math.round(((index + 1) / remoteInfo.chunk_count) * 100));
         progressBar.style.width = pct + '%';
-        status.textContent =
-          (startIndex > 0 ? 'Resuming' : 'Downloading & decrypting') +
-          '… ' + pct + '% · chunk ' + (index + 1) + '/' + remoteInfo.chunk_count;
+        status.textContent = t('downloading_progress', {
+          mode: startIndex > 0 ? t('mode_resuming') : t('mode_downloading'),
+          pct,
+          current: index + 1,
+          total: remoteInfo.chunk_count
+        });
       }
 
       await sink.close();
@@ -649,11 +654,11 @@
       }
 
       progressBar.style.width = '100%';
-      status.textContent = 'Decrypted. Your file has been saved.';
-      title.textContent = 'Transfer complete';
+      status.textContent = t('decrypted_saved');
+      title.textContent = t('transfer_complete');
       description.textContent = remoteInfo.once
-        ? 'The one-time encrypted server copy has been removed.'
-        : 'The file was decrypted only in this browser.';
+        ? t('one_time_removed')
+        : t('decrypted_local');
 
       downloadBtn.classList.add('hidden');
       fileName.textContent = manifest.name || 'download';
@@ -688,32 +693,57 @@
       }
 
       if (err && err.name === 'AbortError') {
-        status.textContent = 'Save cancelled.';
+        status.textContent = t('save_cancelled');
       } else if (err && err.name === 'ResumePermissionError') {
         status.textContent = err.message;
       } else if (err && err.name === 'ResumeFileMismatchError') {
         await deleteDownloadState(id);
         resumeState = null;
-        status.textContent =
-          err.message + ' The saved resume state was cleared; start the download again.';
-        downloadBtn.textContent = 'Start download again';
+        status.textContent = t('resume_state_cleared', { error: err.message });
+        downloadBtn.textContent = t('start_again');
       } else if (sink && sink.resumable && resumeState) {
         const pct = Math.floor((resumeState.next_index / remoteInfo.chunk_count) * 100);
-        status.textContent =
-          'Download paused at ' + pct + '%. Open this link again and choose Resume download.';
-        downloadBtn.textContent = 'Resume download';
+        status.textContent = t('download_paused', { pct });
+        downloadBtn.textContent = t('resume_download');
       } else {
-        status.textContent = 'Error: ' + (err.message || 'Download failed');
+        status.textContent = t('error', { error: err.message || 'Download failed' });
       }
 
       downloadBtn.disabled = false;
     }
   }
 
+
+  window.addEventListener('sendzero:languagechange', () => {
+    if (manifest && remoteInfo) {
+      if (resumeState) {
+        const pct = Math.floor((resumeState.next_index / remoteInfo.chunk_count) * 100);
+        title.textContent = t('interrupted_download_found');
+        description.textContent = t('can_continue_download');
+        downloadBtn.textContent = t('resume_download');
+        fileMeta.textContent = t('already_saved', {
+          size: formatBytes(manifest.size),
+          pct,
+          next: Math.min(resumeState.next_index + 1, remoteInfo.chunk_count),
+          total: remoteInfo.chunk_count
+        });
+      } else if (!downloadBtn.classList.contains('hidden')) {
+        title.textContent = t('encrypted_ready');
+        description.textContent = remoteInfo.once ? t('one_time_ready_desc') : t('chunk_decrypt_desc');
+        downloadBtn.textContent = t('decrypt_save');
+        fileMeta.textContent = t('encrypted_meta', {
+          size: formatBytes(manifest.size),
+          total: remoteInfo.chunk_count,
+          date: new Date(remoteInfo.expires_at * 1000).toLocaleString()
+        });
+      }
+    }
+  });
+
   downloadBtn.addEventListener('click', downloadAndDecrypt);
 
   if (!window.crypto || !crypto.subtle) {
-    showError('This browser does not support the Web Crypto API.');
+    showError(t('webcrypto_unsupported'));
   } else {
     loadInfo();
   }
