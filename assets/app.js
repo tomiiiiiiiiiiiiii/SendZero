@@ -2,6 +2,7 @@
   'use strict';
 
   const MAX_BYTES = 5 * 1024 * 1024 * 1024;
+  const t = (key, vars) => window.SendZeroI18n.t(key, vars);
   const RESUME_STORAGE_KEY = 'sendzero_upload_sessions_v1';
   const LOCAL_SESSION_MAX_AGE = 8 * 60 * 60 * 1000;
 
@@ -141,6 +142,14 @@
     return hex(new Uint8Array(digest));
   }
 
+  function syncTtlPicker() {
+    document.querySelectorAll('[data-ttl]').forEach(button => {
+      const active = button.getAttribute('data-ttl') === String(ttl.value);
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
   async function setFile(file) {
     if (!file) return;
 
@@ -148,18 +157,18 @@
       selectedFile = null;
       selectedFingerprint = null;
       sendBtn.disabled = true;
-      sendBtn.textContent = 'Encrypt & upload';
-      dropTitle.textContent = 'File is too large';
-      dropText.textContent = 'Maximum size is 5 GiB.';
+      sendBtn.textContent = t('encrypt_upload');
+      dropTitle.textContent = t('file_too_large');
+      dropText.textContent = t('max_size');
       return;
     }
 
     selectedFile = file;
     selectedFingerprint = null;
     sendBtn.disabled = true;
-    sendBtn.textContent = 'Checking file…';
+    sendBtn.textContent = t('checking_file');
     dropTitle.textContent = file.name;
-    dropText.textContent = formatBytes(file.size) + ' · checking for interrupted upload…';
+    dropText.textContent = formatBytes(file.size) + ' · ' + t('checking_interrupted');
 
     try {
       selectedFingerprint = await fingerprintFile(file);
@@ -168,10 +177,11 @@
       if (session && session.file_size === file.size && session.last_modified === file.lastModified) {
         ttl.value = String(session.ttl);
         once.checked = !!session.once;
-        sendBtn.textContent = 'Resume upload';
-        dropText.textContent = formatBytes(file.size) + ' · interrupted upload found';
+        syncTtlPicker();
+        sendBtn.textContent = t('resume_upload');
+        dropText.textContent = formatBytes(file.size) + ' · ' + t('interrupted_upload_found');
       } else {
-        sendBtn.textContent = 'Encrypt & upload';
+        sendBtn.textContent = t('encrypt_upload');
         dropText.textContent = formatBytes(file.size);
       }
 
@@ -179,8 +189,8 @@
     } catch (err) {
       selectedFile = null;
       sendBtn.disabled = true;
-      sendBtn.textContent = 'Encrypt & upload';
-      dropText.textContent = 'Could not prepare this file.';
+      sendBtn.textContent = t('encrypt_upload');
+      dropText.textContent = t('could_not_prepare');
     }
   }
 
@@ -340,7 +350,7 @@
       const resumed = await resumeExistingSession(stored);
       if (resumed) return resumed;
 
-      status.textContent = 'Previous upload expired. Creating a new transfer…';
+      status.textContent = t('previous_upload_expired');
     }
 
     return createNewSession();
@@ -352,7 +362,7 @@
     sendBtn.disabled = true;
     progressWrap.classList.remove('hidden');
     progressBar.style.width = '1%';
-    status.textContent = 'Preparing encrypted transfer…';
+    status.textContent = t('preparing_transfer');
 
     try {
       const context = await getUploadContext();
@@ -360,7 +370,7 @@
 
       if (context.keyBytes.length !== 32) {
         removeSession(selectedFingerprint);
-        throw new Error('Saved encryption key is invalid. Start a new transfer.');
+        throw new Error(t('saved_key_invalid'));
       }
 
       const key = await crypto.subtle.importKey(
@@ -381,8 +391,10 @@
       if (context.resumed) {
         const resumePct = Math.max(1, Math.min(98, Math.round((uploadedBytes / selectedFile.size) * 98)));
         progressBar.style.width = resumePct + '%';
-        status.textContent =
-          'Resuming upload · ' + uploadedSet.size + '/' + session.chunk_count + ' chunks already on server';
+        status.textContent = t('resuming_upload_existing', {
+          done: uploadedSet.size,
+          total: session.chunk_count
+        });
       }
 
       if (!context.manifestUploaded) {
@@ -414,12 +426,15 @@
 
         const pct = Math.max(1, Math.min(98, Math.round((uploadedBytes / selectedFile.size) * 98)));
         progressBar.style.width = pct + '%';
-        status.textContent =
-          (context.resumed ? 'Resuming' : 'Encrypting & uploading') +
-          '… ' + pct + '% · ' + uploadedSet.size + '/' + session.chunk_count + ' chunks';
+        status.textContent = t('uploading_progress', {
+          mode: context.resumed ? t('mode_resuming') : t('mode_uploading'),
+          pct,
+          done: uploadedSet.size,
+          total: session.chunk_count
+        });
       }
 
-      status.textContent = 'Finalizing transfer…';
+      status.textContent = t('finalizing_transfer');
 
       const complete = await postForm('api/complete.php', {
         id: session.id,
@@ -435,8 +450,9 @@
 
       const expiry = new Date(complete.expires_at * 1000);
       resultMeta.textContent =
-        formatBytes(selectedFile.size) + ' · expires ' + expiry.toLocaleString() +
-        (complete.once ? ' · one-time download enabled' : '');
+        formatBytes(selectedFile.size) + ' · ' +
+        t('expires', { date: expiry.toLocaleString() }) +
+        (complete.once ? ' · ' + t('one_time_enabled') : '');
 
       removeSession(selectedFingerprint);
 
@@ -444,16 +460,32 @@
       resultCard.classList.remove('hidden');
     } catch (err) {
       sendBtn.disabled = false;
-      sendBtn.textContent = getSession(selectedFingerprint) ? 'Resume upload' : 'Encrypt & upload';
+      sendBtn.textContent = getSession(selectedFingerprint) ? t('resume_upload') : t('encrypt_upload');
 
       const session = getSession(selectedFingerprint);
       if (session) {
-        status.textContent = 'Upload paused: ' + err.message + ' · choose the same file later to resume.';
+        status.textContent = t('upload_paused', { error: err.message });
       } else {
-        status.textContent = 'Error: ' + err.message;
+        status.textContent = t('error', { error: err.message });
       }
     }
   }
+
+  document.querySelectorAll('[data-ttl]').forEach(button => {
+    button.addEventListener('click', () => {
+      ttl.value = button.getAttribute('data-ttl');
+      syncTtlPicker();
+    });
+  });
+
+  syncTtlPicker();
+
+  window.addEventListener('sendzero:languagechange', () => {
+    syncTtlPicker();
+    if (selectedFile && !sendBtn.disabled) {
+      setFile(selectedFile);
+    }
+  });
 
   fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
 
@@ -481,8 +513,8 @@
   copyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(shareUrl.value);
-      copyBtn.textContent = 'Copied';
-      setTimeout(() => copyBtn.textContent = 'Copy', 1400);
+      copyBtn.textContent = t('copied');
+      setTimeout(() => copyBtn.textContent = t('copy'), 1400);
     } catch (e) {
       shareUrl.select();
       document.execCommand('copy');
