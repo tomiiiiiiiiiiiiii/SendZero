@@ -12,6 +12,11 @@ $token = strtolower((string)sz_read_request_value('token', ''));
 $meta = sz_require_ready_meta($id);
 
 if (empty($meta['once'])) {
+    if (!sz_check_transfer_download_token($id, $meta, $token)) {
+        sz_json(array('ok' => false, 'error' => 'forbidden'), 403);
+    }
+
+    sz_download_session_release($id, $token);
     sz_json(array('ok' => true, 'deleted' => false), 200);
 }
 
