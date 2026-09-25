@@ -340,7 +340,7 @@ function sz_client_tag() {
     return substr(hash_hmac('sha256', sz_client_ip(), $secret), 0, 32);
 }
 
-function sz_rate_limit_consume($fileSize, $clientTag, $requestId) {
+function sz_rate_limit_consume($fileSize, $clientTag, $requestId, $commit) {
     if (!SENDZERO_RATE_LIMIT_ENABLED) {
         return array('ok' => true, 'retry_after' => 0);
     }
@@ -437,6 +437,12 @@ function sz_rate_limit_consume($fileSize, $clientTag, $requestId) {
             'error' => 'daily_transfer_limit',
             'retry_after' => max(1, ($dayStart + 86400) - $now)
         );
+    }
+
+    if (!$commit) {
+        @flock($fh, LOCK_UN);
+        fclose($fh);
+        return array('ok' => true, 'retry_after' => 0, 'duplicate' => false);
     }
 
     $state['hour_count'] = $hourCount + 1;
