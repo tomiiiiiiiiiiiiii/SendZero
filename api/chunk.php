@@ -37,8 +37,28 @@ if ($index < 0 || $index >= (int)$meta['chunk_count']) {
     sz_json(array('ok' => false,'error' => 'invalid_index'), 400);
 }
 
-if (!isset($_FILES['payload']) || $_FILES['payload']['error'] !== UPLOAD_ERR_OK) {
+if (!isset($_FILES['payload'])) {
     sz_json(array('ok' => false, 'error' => 'missing_payload'), 400);
+}
+
+$uploadError = isset($_FILES['payload']['error'])
+    ? (int)$_FILES['payload']['error']
+    : UPLOAD_ERR_NO_FILE;
+
+if ($uploadError === UPLOAD_ERR_INI_SIZE || $uploadError === UPLOAD_ERR_FORM_SIZE) {
+    sz_json(array(
+        'ok' => false,
+        'error' => 'request_too_large',
+        'limit' => 'upload_max_filesize'
+    ), 413);
+}
+
+if ($uploadError !== UPLOAD_ERR_OK) {
+    sz_json(array(
+        'ok' => false,
+        'error' => 'upload_failed',
+        'upload_error' => $uploadError
+    ), 400);
 }
 
 $plainSize = min((int)$meta['chunk_size'], (int)$meta['file_size'] - ($index * (int)$meta['chunk_size']));
