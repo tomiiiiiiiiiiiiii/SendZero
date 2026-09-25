@@ -54,6 +54,17 @@ return array(
     // Enforced independently by each child node.
     'max_active_uploads_per_client' => 3,
 
+    // Limit concurrent readers of the same transfer on a child node.
+    'max_active_downloads_per_transfer' => 8,
+
+    /*
+     * Egress cap per transfer. 20 means at most roughly 20 full-file
+     * equivalents, with a 5 GiB minimum allowance for small files.
+     * Set multiplier to 0 to disable the per-transfer egress cap.
+     */
+    'download_egress_multiplier' => 20,
+    'download_min_egress_bytes' => 5 * 1024 * 1024 * 1024,
+
     /*
      * Leave empty when PHP sees the real client in REMOTE_ADDR.
      * When behind a TRUSTED reverse proxy which overwrites the header,
