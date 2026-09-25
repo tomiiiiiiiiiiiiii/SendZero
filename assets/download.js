@@ -137,6 +137,16 @@
     } catch (e) {}
   }
 
+  function downloadApiErrorMessage(code) {
+    const keys = {
+      too_many_active_downloads: 'error_too_many_active_downloads',
+      download_session_unavailable: 'error_service_busy',
+      download_session_busy: 'error_service_busy'
+    };
+
+    return keys[code] ? t(keys[code]) : code;
+  }
+
   async function postForm(url, values) {
     const form = new FormData();
     Object.keys(values).forEach(key => form.append(key, String(values[key])));
@@ -145,9 +155,10 @@
     try { data = await response.json(); } catch (e) {}
 
     if (!response.ok || !data || !data.ok) {
-      const error = new Error((data && data.error) || ('HTTP ' + response.status));
+      const code = data && data.error ? data.error : null;
+      const error = new Error(code ? downloadApiErrorMessage(code) : ('HTTP ' + response.status));
       error.status = response.status;
-      error.code = data && data.error ? data.error : null;
+      error.code = code;
       throw error;
     }
 
@@ -706,12 +717,10 @@
       /*
        * A File System Access download is intentionally NOT aborted server-side.
        * Its token and verified byte offset are kept so the same browser can
-       * continue later. Non-resumable sinks release a one-time session.
+       * continue later. Non-resumable sinks release their server-side session.
        */
       if (
         sessionStarted &&
-        remoteInfo &&
-        remoteInfo.once &&
         downloadToken &&
         (!sink || !sink.resumable)
       ) {
