@@ -1,0 +1,4 @@
+data/*
+!data/.htaccess
+.DS_Store
+Thumbs.db
