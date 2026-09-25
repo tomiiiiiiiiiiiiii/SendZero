@@ -2,6 +2,8 @@
   'use strict';
 
   const MAX_BYTES = 5 * 1024 * 1024 * 1024;
+  const RESUME_STORAGE_KEY = 'sendzero_upload_sessions_v1';
+  const LOCAL_SESSION_MAX_AGE = 8 * 60 * 60 * 1000;
 
   const fileInput = document.getElementById('fileInput');
   const dropzone = document.getElementById('dropzone');
@@ -21,6 +23,7 @@
   const resultMeta = document.getElementById('resultMeta');
 
   let selectedFile = null;
+  let selectedFingerprint = null;
 
   function formatBytes(bytes) {
     if (bytes < 1024) return bytes + ' B';
@@ -29,27 +32,23 @@
     return (bytes / 1024 ** 3).toFixed(2) + ' GiB';
   }
 
-  function setFile(file) {
-    if (!file) return;
-
-    if (file.size > MAX_BYTES) {
-      selectedFile = null;
-      sendBtn.disabled = true;
-      dropTitle.textContent = 'File is too large';
-      dropText.textContent = 'Maximum size is 5 GiB.';
-      return;
-    }
-
-    selectedFile = file;
-    sendBtn.disabled = false;
-    dropTitle.textContent = file.name;
-    dropText.textContent = formatBytes(file.size);
+  function hex(bytes) {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
   function base64Url(bytes) {
     let binary = '';
     for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+
+  function decodeBase64Url(value) {
+    value = value.replace(/-/g, '+').replace(/_/g, '/');
+    while (value.length % 4) value += '=';
+    const binary = atob(value);
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+    return out;
   }
 
   function uint32be(n) {
@@ -69,6 +68,122 @@
     return out;
   }
 
+  function loadSessions() {
+    try {
+      const data = JSON.parse(localStorage.getItem(RESUME_STORAGE_KEY) || '{}');
+      const now = Date.now();
+      let changed = false;
+
+      Object.keys(data).forEach(key => {
+        if (!data[key] || !data[key].saved_at || now - data[key].saved_at > LOCAL_SESSION_MAX_AGE) {
+          delete data[key];
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(data));
+      }
+
+      return data;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function getSession(fingerprint) {
+    if (!fingerprint) return null;
+    const sessions = loadSessions();
+    return sessions[fingerprint] || null;
+  }
+
+  function saveSession(fingerprint, session) {
+    const sessions = loadSessions();
+    session.saved_at = Date.now();
+    sessions[fingerprint] = session;
+    localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(sessions));
+  }
+
+  function removeSession(fingerprint) {
+    if (!fingerprint) return;
+    const sessions = loadSessions();
+    delete sessions[fingerprint];
+    localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(sessions));
+  }
+
+  async function fingerprintFile(file) {
+    const sampleSize = 64 * 1024;
+    const positions = [
+      0,
+      Math.max(0, Math.floor(file.size / 2) - Math.floor(sampleSize / 2)),
+      Math.max(0, file.size - sampleSize)
+    ];
+
+    const unique = [];
+    positions.forEach(pos => {
+      if (unique.indexOf(pos) === -1) unique.push(pos);
+    });
+
+    const parts = [
+      new TextEncoder().encode(JSON.stringify({
+        name: file.name,
+        size: file.size,
+        lastModified: file.lastModified
+      }))
+    ];
+
+    for (const pos of unique) {
+      const end = Math.min(file.size, pos + sampleSize);
+      parts.push(new Uint8Array(await file.slice(pos, end).arrayBuffer()));
+    }
+
+    const digest = await crypto.subtle.digest('SHA-256', concat(parts));
+    return hex(new Uint8Array(digest));
+  }
+
+  async function setFile(file) {
+    if (!file) return;
+
+    if (file.size > MAX_BYTES) {
+      selectedFile = null;
+      selectedFingerprint = null;
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Encrypt & upload';
+      dropTitle.textContent = 'File is too large';
+      dropText.textContent = 'Maximum size is 5 GiB.';
+      return;
+    }
+
+    selectedFile = file;
+    selectedFingerprint = null;
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Checking file…';
+    dropTitle.textContent = file.name;
+    dropText.textContent = formatBytes(file.size) + ' · checking for interrupted upload…';
+
+    try {
+      selectedFingerprint = await fingerprintFile(file);
+      const session = getSession(selectedFingerprint);
+
+      if (session && session.file_size === file.size && session.last_modified === file.lastModified) {
+        ttl.value = String(session.ttl);
+        once.checked = !!session.once;
+        sendBtn.textContent = 'Resume upload';
+        dropText.textContent = formatBytes(file.size) + ' · interrupted upload found';
+      } else {
+        sendBtn.textContent = 'Encrypt & upload';
+        dropText.textContent = formatBytes(file.size);
+      }
+
+      sendBtn.disabled = false;
+    } catch (err) {
+      selectedFile = null;
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Encrypt & upload';
+      dropText.textContent = 'Could not prepare this file.';
+    }
+  }
+
   async function postForm(url, values, fileBlob) {
     const form = new FormData();
     Object.keys(values).forEach(key => form.append(key, String(values[key])));
@@ -77,24 +192,36 @@
     const response = await fetch(url, { method: 'POST', body: form, cache: 'no-store' });
     let data = null;
     try { data = await response.json(); } catch (e) {}
+
     if (!response.ok || !data || !data.ok) {
-      throw new Error((data && data.error) || ('HTTP ' + response.status));
+      const err = new Error((data && data.error) || ('HTTP ' + response.status));
+      err.status = response.status;
+      err.code = data && data.error ? data.error : null;
+      throw err;
     }
+
     return data;
   }
 
   async function uploadWithRetry(url, values, blob, attempts = 3) {
     let lastError = null;
+
     for (let n = 0; n < attempts; n++) {
       try {
         return await postForm(url, values, blob);
       } catch (err) {
         lastError = err;
+
+        if (err.status >= 400 && err.status < 500 && err.status !== 408 && err.status !== 429) {
+          break;
+        }
+
         if (n + 1 < attempts) {
-          await new Promise(resolve => setTimeout(resolve, 600 * (n + 1)));
+          await new Promise(resolve => setTimeout(resolve, 700 * (n + 1)));
         }
       }
     }
+
     throw lastError;
   }
 
@@ -133,59 +260,177 @@
     return new Blob([header, iv, cipher], { type: 'application/octet-stream' });
   }
 
+  function plainChunkSize(fileSize, chunkSize, index) {
+    const start = index * chunkSize;
+    return Math.max(0, Math.min(chunkSize, fileSize - start));
+  }
+
+  async function createNewSession() {
+    const init = await postForm('api/init.php', {
+      file_size: selectedFile.size,
+      ttl: ttl.value,
+      once: once.checked ? '1' : '0'
+    });
+
+    const keyBytes = crypto.getRandomValues(new Uint8Array(32));
+
+    const session = {
+      id: init.id,
+      upload_token: init.upload_token,
+      key: base64Url(keyBytes),
+      chunk_size: init.chunk_size,
+      chunk_count: init.chunk_count,
+      file_size: selectedFile.size,
+      last_modified: selectedFile.lastModified,
+      ttl: Number(ttl.value),
+      once: once.checked
+    };
+
+    saveSession(selectedFingerprint, session);
+
+    return {
+      session,
+      keyBytes,
+      uploadedChunks: [],
+      manifestUploaded: false,
+      resumed: false
+    };
+  }
+
+  async function resumeExistingSession(session) {
+    try {
+      const state = await postForm('api/resume.php', {
+        id: session.id,
+        token: session.upload_token
+      });
+
+      if (
+        state.file_size !== selectedFile.size ||
+        state.chunk_size !== session.chunk_size ||
+        state.chunk_count !== session.chunk_count
+      ) {
+        removeSession(selectedFingerprint);
+        return null;
+      }
+
+      session.ttl = state.retention_ttl;
+      session.once = !!state.once;
+      saveSession(selectedFingerprint, session);
+
+      return {
+        session,
+        keyBytes: decodeBase64Url(session.key),
+        uploadedChunks: state.uploaded_chunks || [],
+        manifestUploaded: !!state.manifest_uploaded,
+        resumed: true
+      };
+    } catch (err) {
+      if ([403, 404, 409, 410].indexOf(err.status) !== -1) {
+        removeSession(selectedFingerprint);
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  async function getUploadContext() {
+    const stored = getSession(selectedFingerprint);
+
+    if (stored && stored.file_size === selectedFile.size && stored.last_modified === selectedFile.lastModified) {
+      const resumed = await resumeExistingSession(stored);
+      if (resumed) return resumed;
+
+      status.textContent = 'Previous upload expired. Creating a new transfer…';
+    }
+
+    return createNewSession();
+  }
+
   async function runUpload() {
-    if (!selectedFile || !window.crypto || !crypto.subtle) return;
+    if (!selectedFile || !selectedFingerprint || !window.crypto || !crypto.subtle) return;
 
     sendBtn.disabled = true;
     progressWrap.classList.remove('hidden');
     progressBar.style.width = '1%';
-    status.textContent = 'Creating encrypted transfer…';
+    status.textContent = 'Preparing encrypted transfer…';
 
     try {
-      const init = await postForm('api/init.php', {
-        file_size: selectedFile.size,
-        ttl: ttl.value,
-        once: once.checked ? '1' : '0'
+      const context = await getUploadContext();
+      const session = context.session;
+
+      if (context.keyBytes.length !== 32) {
+        removeSession(selectedFingerprint);
+        throw new Error('Saved encryption key is invalid. Start a new transfer.');
+      }
+
+      const key = await crypto.subtle.importKey(
+        'raw',
+        context.keyBytes,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt']
+      );
+
+      const uploadedSet = new Set(context.uploadedChunks.map(Number));
+      let uploadedBytes = 0;
+
+      uploadedSet.forEach(index => {
+        uploadedBytes += plainChunkSize(selectedFile.size, session.chunk_size, index);
       });
 
-      const keyBytes = crypto.getRandomValues(new Uint8Array(32));
-      const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+      if (context.resumed) {
+        const resumePct = Math.max(1, Math.min(98, Math.round((uploadedBytes / selectedFile.size) * 98)));
+        progressBar.style.width = resumePct + '%';
+        status.textContent =
+          'Resuming upload · ' + uploadedSet.size + '/' + session.chunk_count + ' chunks already on server';
+      }
 
-      const manifest = await encryptManifest(key, selectedFile, init.chunk_size, init.chunk_count);
-      await uploadWithRetry('api/manifest_upload.php', {
-        id: init.id,
-        token: init.upload_token
-      }, manifest);
+      if (!context.manifestUploaded) {
+        const manifest = await encryptManifest(key, selectedFile, session.chunk_size, session.chunk_count);
+        await uploadWithRetry('api/manifest_upload.php', {
+          id: session.id,
+          token: session.upload_token
+        }, manifest);
+      }
 
-      for (let index = 0; index < init.chunk_count; index++) {
-        const start = index * init.chunk_size;
-        const end = Math.min(selectedFile.size, start + init.chunk_size);
+      for (let index = 0; index < session.chunk_count; index++) {
+        if (uploadedSet.has(index)) {
+          continue;
+        }
+
+        const start = index * session.chunk_size;
+        const end = Math.min(selectedFile.size, start + session.chunk_size);
         const plainBuffer = await selectedFile.slice(start, end).arrayBuffer();
         const encryptedChunk = await encryptChunk(key, index, plainBuffer);
 
         await uploadWithRetry('api/chunk.php', {
-          id: init.id,
-          token: init.upload_token,
+          id: session.id,
+          token: session.upload_token,
           index
         }, encryptedChunk);
 
-        const done = end;
-        const pct = Math.max(1, Math.min(98, Math.round((done / selectedFile.size) * 98)));
+        uploadedSet.add(index);
+        uploadedBytes += end - start;
+
+        const pct = Math.max(1, Math.min(98, Math.round((uploadedBytes / selectedFile.size) * 98)));
         progressBar.style.width = pct + '%';
-        status.textContent = 'Encrypting & uploading… ' + pct + '% · chunk ' + (index + 1) + '/' + init.chunk_count;
+        status.textContent =
+          (context.resumed ? 'Resuming' : 'Encrypting & uploading') +
+          '… ' + pct + '% · ' + uploadedSet.size + '/' + session.chunk_count + ' chunks';
       }
 
       status.textContent = 'Finalizing transfer…';
+
       const complete = await postForm('api/complete.php', {
-        id: init.id,
-        token: init.upload_token
+        id: session.id,
+        token: session.upload_token
       });
 
       progressBar.style.width = '100%';
 
       const base = new URL('download.html', window.location.href);
-      base.search = '?id=' + encodeURIComponent(init.id);
-      base.hash = 'k=' + base64Url(keyBytes);
+      base.search = '?id=' + encodeURIComponent(session.id);
+      base.hash = 'k=' + session.key;
       shareUrl.value = base.toString();
 
       const expiry = new Date(complete.expires_at * 1000);
@@ -193,12 +438,20 @@
         formatBytes(selectedFile.size) + ' · expires ' + expiry.toLocaleString() +
         (complete.once ? ' · one-time download enabled' : '');
 
+      removeSession(selectedFingerprint);
+
       uploadCard.classList.add('hidden');
       resultCard.classList.remove('hidden');
     } catch (err) {
       sendBtn.disabled = false;
-      progressBar.style.width = '0%';
-      status.textContent = 'Error: ' + err.message;
+      sendBtn.textContent = getSession(selectedFingerprint) ? 'Resume upload' : 'Encrypt & upload';
+
+      const session = getSession(selectedFingerprint);
+      if (session) {
+        status.textContent = 'Upload paused: ' + err.message + ' · choose the same file later to resume.';
+      } else {
+        status.textContent = 'Error: ' + err.message;
+      }
     }
   }
 
