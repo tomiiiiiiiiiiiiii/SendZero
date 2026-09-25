@@ -209,9 +209,16 @@ function sz_delete_tree($path) {
 }
 
 function sz_delete_transfer($id) {
-    if (sz_valid_id($id)) {
-        sz_delete_tree(sz_transfer_dir($id));
+    if (!sz_valid_id($id)) {
+        return;
     }
+
+    $meta = sz_load_meta($id);
+    if (is_array($meta) && !empty($meta['client_tag'])) {
+        sz_active_upload_release((string)$meta['client_tag'], $id);
+    }
+
+    sz_delete_tree(sz_transfer_dir($id));
 }
 
 function sz_is_expired($meta) {
@@ -268,6 +275,261 @@ function sz_read_request_value($name, $default) {
         return $_POST[$name];
     }
     return $default;
+}
+
+
+/* ---------- client identity / file-based anti-abuse ---------- */
+
+function sz_client_ip() {
+    $ip = isset($_SERVER['REMOTE_ADDR']) ? trim((string)$_SERVER['REMOTE_ADDR']) : '';
+
+    if (SENDZERO_CLIENT_IP_HEADER !== '' && isset($_SERVER[SENDZERO_CLIENT_IP_HEADER])) {
+        $candidate = trim((string)$_SERVER[SENDZERO_CLIENT_IP_HEADER]);
+
+        /*
+         * Some proxy headers may contain a comma-separated chain. When an
+         * explicitly trusted header is configured, use the first address.
+         */
+        if (strpos($candidate, ',') !== false) {
+            $parts = explode(',', $candidate);
+            $candidate = trim($parts[0]);
+        }
+
+        if (filter_var($candidate, FILTER_VALIDATE_IP)) {
+            $ip = $candidate;
+        }
+    }
+
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+        $ip = '0.0.0.0';
+    }
+
+    return $ip;
+}
+
+function sz_rate_secret() {
+    $path = DATA_DIR . '/.rate-secret';
+
+    if (is_file($path)) {
+        $secret = trim((string)@file_get_contents($path));
+        if (strlen($secret) >= 32) {
+            return $secret;
+        }
+    }
+
+    $secret = sz_random_hex(32);
+    if (@file_put_contents($path, $secret . PHP_EOL, LOCK_EX) === false) {
+        throw new Exception('Could not persist rate-limit secret.');
+    }
+
+    @chmod($path, 0600);
+    return $secret;
+}
+
+function sz_client_tag() {
+    try {
+        $secret = sz_rate_secret();
+    } catch (Exception $e) {
+        /*
+         * Fail closed to one shared bucket rather than storing raw IPs or
+         * silently disabling abuse protection.
+         */
+        return str_repeat('0', 32);
+    }
+
+    return substr(hash_hmac('sha256', sz_client_ip(), $secret), 0, 32);
+}
+
+function sz_rate_limit_consume($fileSize, $clientTag) {
+    if (!SENDZERO_RATE_LIMIT_ENABLED) {
+        return array('ok' => true, 'retry_after' => 0);
+    }
+
+    if (!preg_match('/^[a-f0-9]{32}$/', $clientTag)) {
+        return array('ok' => false, 'error' => 'rate_limit_identity_failed', 'retry_after' => 60);
+    }
+
+    $dir = DATA_DIR . '/.ratelimit';
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+        return array('ok' => false, 'error' => 'rate_limit_unavailable', 'retry_after' => 60);
+    }
+
+    $path = $dir . '/' . $clientTag . '.json';
+    $fh = @fopen($path, 'c+');
+    if (!$fh) {
+        return array('ok' => false, 'error' => 'rate_limit_unavailable', 'retry_after' => 60);
+    }
+
+    if (!@flock($fh, LOCK_EX)) {
+        fclose($fh);
+        return array('ok' => false, 'error' => 'rate_limit_busy', 'retry_after' => 10);
+    }
+
+    rewind($fh);
+    $state = json_decode(stream_get_contents($fh), true);
+    if (!is_array($state)) {
+        $state = array();
+    }
+
+    $now = time();
+    $hourStart = (int)(floor($now / 3600) * 3600);
+    $dayStart = (int)(floor($now / 86400) * 86400);
+
+    if (!isset($state['hour_start']) || (int)$state['hour_start'] !== $hourStart) {
+        $state['hour_start'] = $hourStart;
+        $state['hour_count'] = 0;
+    }
+
+    if (!isset($state['day_start']) || (int)$state['day_start'] !== $dayStart) {
+        $state['day_start'] = $dayStart;
+        $state['day_bytes'] = 0;
+    }
+
+    $hourCount = isset($state['hour_count']) ? (int)$state['hour_count'] : 0;
+    $dayBytes = isset($state['day_bytes']) ? (float)$state['day_bytes'] : 0;
+
+    if (
+        SENDZERO_RATE_MAX_ALLOCATIONS_PER_HOUR > 0 &&
+        $hourCount >= SENDZERO_RATE_MAX_ALLOCATIONS_PER_HOUR
+    ) {
+        @flock($fh, LOCK_UN);
+        fclose($fh);
+
+        return array(
+            'ok' => false,
+            'error' => 'too_many_transfers',
+            'retry_after' => max(1, ($hourStart + 3600) - $now)
+        );
+    }
+
+    if (
+        SENDZERO_RATE_MAX_BYTES_PER_DAY > 0 &&
+        $dayBytes + (float)$fileSize > SENDZERO_RATE_MAX_BYTES_PER_DAY
+    ) {
+        @flock($fh, LOCK_UN);
+        fclose($fh);
+
+        return array(
+            'ok' => false,
+            'error' => 'daily_transfer_limit',
+            'retry_after' => max(1, ($dayStart + 86400) - $now)
+        );
+    }
+
+    $state['hour_count'] = $hourCount + 1;
+    $state['day_bytes'] = $dayBytes + (float)$fileSize;
+    $state['updated_at'] = $now;
+
+    ftruncate($fh, 0);
+    rewind($fh);
+    fwrite($fh, json_encode($state));
+    fflush($fh);
+    @flock($fh, LOCK_UN);
+    fclose($fh);
+    @chmod($path, 0600);
+
+    return array('ok' => true, 'retry_after' => 0);
+}
+
+function sz_active_uploads_path($clientTag) {
+    return DATA_DIR . '/.active_uploads/' . $clientTag . '.json';
+}
+
+function sz_active_upload_acquire($clientTag, $id, $expiresAt) {
+    if (SENDZERO_NODE_MAX_ACTIVE_UPLOADS_PER_CLIENT <= 0) {
+        return true;
+    }
+
+    if (!preg_match('/^[a-f0-9]{32}$/', $clientTag) || !sz_valid_id($id)) {
+        return false;
+    }
+
+    $dir = DATA_DIR . '/.active_uploads';
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+        return false;
+    }
+
+    $path = sz_active_uploads_path($clientTag);
+    $fh = @fopen($path, 'c+');
+    if (!$fh) {
+        return false;
+    }
+
+    if (!@flock($fh, LOCK_EX)) {
+        fclose($fh);
+        return false;
+    }
+
+    rewind($fh);
+    $state = json_decode(stream_get_contents($fh), true);
+    if (!is_array($state)) {
+        $state = array();
+    }
+
+    $now = time();
+    foreach ($state as $transferId => $expiry) {
+        if (!sz_valid_id($transferId) || (int)$expiry <= $now) {
+            unset($state[$transferId]);
+        }
+    }
+
+    if (!isset($state[$id]) && count($state) >= SENDZERO_NODE_MAX_ACTIVE_UPLOADS_PER_CLIENT) {
+        @flock($fh, LOCK_UN);
+        fclose($fh);
+        return false;
+    }
+
+    $state[$id] = (int)$expiresAt;
+
+    ftruncate($fh, 0);
+    rewind($fh);
+    fwrite($fh, json_encode($state));
+    fflush($fh);
+    @flock($fh, LOCK_UN);
+    fclose($fh);
+    @chmod($path, 0600);
+
+    return true;
+}
+
+function sz_active_upload_release($clientTag, $id) {
+    if (!is_string($clientTag) || !preg_match('/^[a-f0-9]{32}$/', $clientTag) || !sz_valid_id($id)) {
+        return;
+    }
+
+    $path = sz_active_uploads_path($clientTag);
+    $fh = @fopen($path, 'c+');
+    if (!$fh) {
+        return;
+    }
+
+    if (!@flock($fh, LOCK_EX)) {
+        fclose($fh);
+        return;
+    }
+
+    rewind($fh);
+    $state = json_decode(stream_get_contents($fh), true);
+    if (!is_array($state)) {
+        $state = array();
+    }
+
+    unset($state[$id]);
+
+    if (count($state) === 0) {
+        @flock($fh, LOCK_UN);
+        fclose($fh);
+        @unlink($path);
+        return;
+    }
+
+    ftruncate($fh, 0);
+    rewind($fh);
+    fwrite($fh, json_encode($state));
+    fflush($fh);
+    @flock($fh, LOCK_UN);
+    fclose($fh);
+    @chmod($path, 0600);
 }
 
 /* ---------- allocation tokens ---------- */
@@ -332,7 +594,10 @@ function sz_claim_allocation_nonce($nonce, $expiresAt) {
 
 function sz_verify_and_claim_allocation($token, $fileSize, $ttl, $once) {
     if (!SENDZERO_REQUIRE_ALLOCATION) {
-        return true;
+        return array(
+            'client' => sz_client_tag(),
+            'exp' => time() + SENDZERO_ALLOCATION_TTL
+        );
     }
 
     $payload = sz_allocation_verify($token, sz_local_node_secret());
@@ -354,7 +619,11 @@ function sz_verify_and_claim_allocation($token, $fileSize, $ttl, $once) {
         return false;
     }
 
-    return sz_claim_allocation_nonce($payload['nonce'], (int)$payload['exp']);
+    if (!sz_claim_allocation_nonce($payload['nonce'], (int)$payload['exp'])) {
+        return false;
+    }
+
+    return $payload;
 }
 
 /* ---------- node status / master dispatcher ---------- */
@@ -378,8 +647,15 @@ function sz_local_node_status() {
         }
     }
 
+    $usedPercent = $total > 0
+        ? max(0.0, min(100.0, (($total - $free) / $total) * 100.0))
+        : 100.0;
+
+    $diskWarning = $usedPercent >= SENDZERO_NODE_WARN_DISK_USED_PERCENT;
+
     $accept = SENDZERO_NODE_ACCEPT_UPLOADS &&
-        $free >= SENDZERO_NODE_MIN_FREE_BYTES;
+        $free >= SENDZERO_NODE_MIN_FREE_BYTES &&
+        $usedPercent < SENDZERO_NODE_MAX_DISK_USED_PERCENT;
 
     return array(
         'ok' => true,
@@ -387,6 +663,9 @@ function sz_local_node_status() {
         'accept_uploads' => $accept,
         'free_bytes' => (float)$free,
         'total_bytes' => (float)$total,
+        'disk_used_percent' => round($usedPercent, 2),
+        'disk_warning' => $diskWarning,
+        'disk_stop_percent' => SENDZERO_NODE_MAX_DISK_USED_PERCENT,
         'load_1m' => $load,
         'time' => time()
     );
