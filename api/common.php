@@ -48,6 +48,7 @@ function sz_handle_options() {
     }
 }
 
+sz_apply_cors_headers();
 sz_handle_options();
 
 function sz_random_hex($bytes) {
