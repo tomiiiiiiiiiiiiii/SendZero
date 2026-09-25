@@ -4,7 +4,7 @@
 
 SendZero encrypts files in the browser before upload. The server stores encrypted manifests and encrypted chunks, while the decryption key remains in the URL fragment after `#` and is not sent to PHP.
 
-The core transfer path is now **production-tested on the deployed HTTPS instance at `sendzero.link`**. Validation includes a full **5 GiB end-to-end transfer with matching SHA-256**, interrupted upload and download resume, one-time deletion, sender revoke, Recent transfers recovery, cleanup/expiry, abuse and egress limits, disk emergency-stop behavior, admin CLI operations, security headers, and a long-running download session. The repository remains under active development; this validation is operational testing, not an independent security audit.
+The core transfer path is **production-tested on the deployed HTTPS instance at `sendzero.link`**. Validation includes a full **5 GiB end-to-end transfer with matching SHA-256**, interrupted upload and download resume, one-time deletion, sender revoke, Recent transfers recovery, cleanup/expiry, abuse and egress limits, disk emergency-stop behavior, admin CLI operations, security headers, and a long-running download session. The full Git history is also checked automatically for accidentally committed credentials and private runtime/configuration files. SendZero is ready for public source release, while remaining under active development. This validation is operational testing and automated release hygiene, not an independent security audit.
 
 ## Highlights
 
@@ -24,6 +24,8 @@ The core transfer path is now **production-tested on the deployed HTTPS instance
 - multi-node administration CLI;
 - multilingual FAQ, Terms of Use, Privacy Policy and dedicated abuse contact;
 - production preflight checker;
+- responsible vulnerability reporting policy;
+- full-history credential/configuration audit in CI;
 - GitHub Actions syntax checks for **PHP 5.6, PHP 8.2 and JavaScript**.
 
 ## Security model
@@ -403,18 +405,50 @@ The reproducible test procedure remains in [docs/TESTING.md](docs/TESTING.md).
 
 A completed transfer with a different SHA-256 hash is a release blocker.
 
+## Security reporting and release hygiene
+
+Security issues should be reported privately according to [SECURITY.md](SECURITY.md). Do not open a public issue for an unpatched vulnerability.
+
+Before public release, the complete Git history was reviewed for sensitive repository content. The repository also includes an automated history audit that scans every reachable Git blob for:
+
+- private keys;
+- common GitHub, AWS, Google, Slack, GitLab and Stripe credential formats;
+- suspicious hard-coded credential assignments;
+- local/private files such as `config.local.php`, `nodes.php`, `.env`, private key files and runtime transfer data.
+
+The audit runs from:
+
+```text
+.github/workflows/history-audit.yml
+```
+
+using:
+
+```text
+tools/audit-history.py
+```
+
+The full-history audit has passed on the repository history prior to public release.
+
+This automated check reduces accidental secret exposure risk, but it is not a substitute for an independent security audit.
+
 ## CI
 
-GitHub Actions runs syntax checks on every push / pull request for:
+GitHub Actions runs on pushes and pull requests.
+
+Syntax checks cover:
 
 - PHP 5.6;
 - PHP 8.2;
 - JavaScript.
 
-Workflow:
+A separate release-hygiene workflow checks the complete Git history for recognized credential patterns and forbidden private/runtime files.
+
+Workflows:
 
 ```text
 .github/workflows/syntax.yml
+.github/workflows/history-audit.yml
 ```
 
 ## Interface languages
@@ -431,7 +465,9 @@ Language choice is stored locally in the browser.
 
 ```text
 SendZero/
-├── .github/workflows/syntax.yml
+├── .github/workflows/
+│   ├── syntax.yml
+│   └── history-audit.yml
 ├── index.html
 ├── download.html
 ├── terms.html
@@ -445,6 +481,7 @@ SendZero/
 ├── cleanup.php
 ├── sendzero-admin.php
 ├── sendzero-preflight.php
+├── SECURITY.md
 ├── api/
 │   ├── admin.php
 │   ├── allocate.php
@@ -473,6 +510,7 @@ SendZero/
 │   ├── PRODUCTION.md
 │   └── TESTING.md
 ├── tools/
+│   ├── audit-history.py
 │   ├── make-large-test-file.sh
 │   └── verify-large-test-file.sh
 └── data/
@@ -483,6 +521,7 @@ Production storage should normally use a configured `DATA_DIR` outside this repo
 
 ## Documentation
 
+- [Security policy](SECURITY.md)
 - [Multi-server deployment](docs/MULTI_SERVER.md)
 - [Production hardening](docs/PRODUCTION.md)
 - [Production test checklist](docs/TESTING.md)
@@ -526,7 +565,7 @@ Verified on the deployed HTTPS instance:
 - deployment security headers;
 - long-running download session behavior.
 
-The repository remains private while the project is being prepared for public release. Further work is now primarily deployment hardening, documentation and release preparation rather than unverified core transfer functionality.
+The deployed core has been validated, the repository history audit passes, and the source tree is prepared for public release. Further work is primarily ongoing hardening, documentation and normal project maintenance rather than unverified core transfer functionality.
 
 ## License
 
