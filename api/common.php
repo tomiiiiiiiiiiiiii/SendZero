@@ -846,6 +846,108 @@ function sz_verify_and_claim_allocation($token, $fileSize, $ttl, $once) {
     return $payload;
 }
 
+/* ---------- authenticated administration ---------- */
+
+function sz_admin_auth_header($secret, $action, $id, $timestamp, $nonce) {
+    $message = 'admin|' . $action . '|' . $id . '|' . $timestamp . '|' . $nonce;
+    return $timestamp . ':' . $nonce . ':' . hash_hmac('sha256', $message, $secret);
+}
+
+function sz_verify_admin_auth($header, $secret, $action, $id) {
+    if (!is_string($header)) {
+        return false;
+    }
+
+    $parts = explode(':', $header, 3);
+    if (count($parts) !== 3) {
+        return false;
+    }
+
+    $timestamp = $parts[0];
+    $nonce = $parts[1];
+    $signature = $parts[2];
+
+    if (
+        !ctype_digit((string)$timestamp) ||
+        abs(time() - (int)$timestamp) > 60 ||
+        !preg_match('/^[a-f0-9]{32}$/', $nonce) ||
+        !preg_match('/^[a-f0-9]{64}$/', $signature)
+    ) {
+        return false;
+    }
+
+    $expected = sz_admin_auth_header($secret, $action, $id, $timestamp, $nonce);
+    $expectedParts = explode(':', $expected, 3);
+
+    if (!isset($expectedParts[2]) || !sz_safe_equals($expectedParts[2], $signature)) {
+        return false;
+    }
+
+    $dir = DATA_DIR . '/.admin_nonces';
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true)) {
+        return false;
+    }
+
+    $path = $dir . '/' . $nonce;
+    $fh = @fopen($path, 'x');
+    if (!$fh) {
+        return false;
+    }
+
+    fwrite($fh, (string)(time() + 120));
+    fclose($fh);
+    @chmod($path, 0600);
+
+    return true;
+}
+
+function sz_admin_transfer_info($id) {
+    if (!sz_valid_id($id)) {
+        return false;
+    }
+
+    $meta = sz_load_meta($id);
+    if ($meta === false) {
+        return false;
+    }
+
+    $storageBytes = 0;
+
+    $manifestPath = sz_manifest_path($id);
+    if (is_file($manifestPath)) {
+        $size = @filesize($manifestPath);
+        if ($size !== false) {
+            $storageBytes += (float)$size;
+        }
+    }
+
+    $chunkCount = isset($meta['chunk_count']) ? (int)$meta['chunk_count'] : 0;
+    for ($i = 0; $i < $chunkCount; $i++) {
+        $path = sz_chunk_path($id, $i);
+        if (!is_file($path)) {
+            continue;
+        }
+
+        $size = @filesize($path);
+        if ($size !== false) {
+            $storageBytes += (float)$size;
+        }
+    }
+
+    return array(
+        'id' => $id,
+        'node_id' => isset($meta['node_id']) ? (string)$meta['node_id'] : SENDZERO_NODE_ID,
+        'state' => isset($meta['state']) ? (string)$meta['state'] : 'unknown',
+        'file_size' => isset($meta['file_size']) ? (int)$meta['file_size'] : 0,
+        'chunk_count' => $chunkCount,
+        'storage_bytes' => $storageBytes,
+        'created_at' => isset($meta['created_at']) ? (int)$meta['created_at'] : 0,
+        'completed_at' => isset($meta['completed_at']) ? (int)$meta['completed_at'] : 0,
+        'expires_at' => isset($meta['expires_at']) ? (int)$meta['expires_at'] : 0,
+        'once' => !empty($meta['once'])
+    );
+}
+
 /* ---------- node status / master dispatcher ---------- */
 
 function sz_local_node_status() {
