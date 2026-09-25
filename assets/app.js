@@ -298,44 +298,63 @@
   }
 
   async function createNewSession() {
-    const allocation = await postForm('api/allocate.php', {
-      file_size: selectedFile.size,
-      ttl: ttl.value,
-      once: once.checked ? '1' : '0'
-    });
+    let lastError = null;
 
-    const init = await postForm(apiUrl(allocation.api_base, 'api/init.php'), {
-      file_size: selectedFile.size,
-      ttl: ttl.value,
-      once: once.checked ? '1' : '0',
-      allocation: allocation.allocation_token
-    });
+    /*
+     * Allocation and init are intentionally separate. If a node disappears
+     * after the master's health check but before init.php, request a fresh
+     * allocation so another healthy child can take the transfer.
+     */
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const allocation = await postForm('api/allocate.php', {
+          file_size: selectedFile.size,
+          ttl: ttl.value,
+          once: once.checked ? '1' : '0'
+        });
 
-    const keyBytes = crypto.getRandomValues(new Uint8Array(32));
+        const init = await postForm(apiUrl(allocation.api_base, 'api/init.php'), {
+          file_size: selectedFile.size,
+          ttl: ttl.value,
+          once: once.checked ? '1' : '0',
+          allocation: allocation.allocation_token
+        });
 
-    const session = {
-      id: init.id,
-      node_id: allocation.node_id,
-      api_base: allocation.api_base || '',
-      upload_token: init.upload_token,
-      key: base64Url(keyBytes),
-      chunk_size: init.chunk_size,
-      chunk_count: init.chunk_count,
-      file_size: selectedFile.size,
-      last_modified: selectedFile.lastModified,
-      ttl: Number(ttl.value),
-      once: once.checked
-    };
+        const keyBytes = crypto.getRandomValues(new Uint8Array(32));
 
-    saveSession(selectedFingerprint, session);
+        const session = {
+          id: init.id,
+          node_id: allocation.node_id,
+          api_base: allocation.api_base || '',
+          upload_token: init.upload_token,
+          key: base64Url(keyBytes),
+          chunk_size: init.chunk_size,
+          chunk_count: init.chunk_count,
+          file_size: selectedFile.size,
+          last_modified: selectedFile.lastModified,
+          ttl: Number(ttl.value),
+          once: once.checked
+        };
 
-    return {
-      session,
-      keyBytes,
-      uploadedChunks: [],
-      manifestUploaded: false,
-      resumed: false
-    };
+        saveSession(selectedFingerprint, session);
+
+        return {
+          session,
+          keyBytes,
+          uploadedChunks: [],
+          manifestUploaded: false,
+          resumed: false
+        };
+      } catch (err) {
+        lastError = err;
+
+        if (attempt + 1 < 3) {
+          await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+        }
+      }
+    }
+
+    throw lastError || new Error('No storage node available');
   }
 
   async function resumeExistingSession(session) {
