@@ -140,6 +140,29 @@ data/<transfer-id>/
 └── ...
 ```
 
+## Database-free multi-server mode
+
+SendZero can scale to multiple storage servers without MySQL, Redis or a shared filesystem.
+
+The main server acts as a dispatcher: before a new upload it checks configured child nodes, selects one with sufficient capacity, and returns a short-lived signed allocation token. The browser then uploads encrypted chunks **directly** to that child node.
+
+Download links contain the node ID:
+
+```text
+download.html?n=s2&id=TRANSFER_ID#k=DECRYPTION_KEY
+```
+
+The master resolves the node ID to its current public URL, but file data never passes through the master.
+
+A child can be removed from new allocations with `enabled => false` while all existing downloads stored on that child continue to work.
+
+See [docs/MULTI_SERVER.md](docs/MULTI_SERVER.md) for deployment examples for:
+
+- one server running as `master + s1`;
+- a dedicated master;
+- independent `s1`, `s2`, `s3` child nodes;
+- adding capacity when disk space or network capacity becomes constrained.
+
 ## Cleanup
 
 Run periodically:
