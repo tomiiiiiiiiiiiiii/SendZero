@@ -26,7 +26,7 @@ html, body {
 
 body { min-height: 100vh; }
 
-button, input, select { font: inherit; }
+button, input { font: inherit; }
 
 .shell {
   width: min(920px, calc(100% - 32px));
@@ -38,7 +38,49 @@ button, input, select { font: inherit; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 18px;
   margin-bottom: 74px;
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.languageSwitcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,.025);
+}
+
+.languageSwitcher button {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  transition: background .18s ease, color .18s ease;
+}
+
+.languageSwitcher button:hover {
+  color: var(--text);
+  background: rgba(255,255,255,.055);
+}
+
+.languageSwitcher button.active {
+  color: var(--accentText);
+  background: var(--accent);
 }
 
 .brand {
@@ -89,6 +131,7 @@ h1 {
 }
 
 h1 span { color: var(--muted); }
+h1 .heroPrimary { color: var(--text); }
 
 h2 {
   margin: 0 0 8px;
@@ -152,45 +195,114 @@ h2 {
 
 .options {
   display: grid;
-  grid-template-columns: 1fr 1.45fr;
+  grid-template-columns: 1fr 1.35fr;
   gap: 14px;
   margin: 16px 0;
 }
 
-.options label {
-  padding: 15px;
+.optionCard {
+  min-height: 92px;
+  padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 15px;
-  background: var(--panel2);
+  border-radius: 17px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,0)),
+    var(--panel2);
 }
 
-.options label > span:first-child {
+.optionLabel {
   display: block;
+  margin-bottom: 11px;
   color: var(--muted);
   font-size: 12px;
-  margin-bottom: 8px;
 }
 
-select {
-  width: 100%;
+.ttlPicker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid rgba(255,255,255,.065);
+  border-radius: 12px;
+  background: #0b0f13;
+}
+
+.ttlPicker button {
+  min-height: 38px;
+  padding: 0 8px;
   border: 0;
-  outline: 0;
-  color: var(--text);
+  border-radius: 9px;
   background: transparent;
-  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 750;
+  white-space: nowrap;
+  transition: background .18s ease, color .18s ease, transform .18s ease;
+}
+
+.ttlPicker button:hover {
+  color: var(--text);
+  background: rgba(255,255,255,.055);
+}
+
+.ttlPicker button.active {
+  color: var(--accentText);
+  background: var(--accent);
+}
+
+.ttlPicker button:active {
+  transform: scale(.98);
 }
 
 .switchRow {
   display: flex !important;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
+  cursor: pointer;
 }
 
 .switchRow > span { margin: 0 !important; }
 .switchRow strong { display: block; color: var(--text); font-size: 14px; }
-.switchRow small { display: block; margin-top: 4px; color: var(--muted); line-height: 1.4; }
-.switchRow input { width: 20px; height: 20px; accent-color: var(--accent); }
+.switchRow small { display: block; margin-top: 5px; color: var(--muted); line-height: 1.45; }
+
+.switchRow input {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px;
+  background: #090c0f;
+  cursor: pointer;
+  transition: background .2s ease, border-color .2s ease;
+}
+
+.switchRow input::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform .2s ease, background .2s ease;
+}
+
+.switchRow input:checked {
+  border-color: rgba(184,255,90,.55);
+  background: rgba(184,255,90,.16);
+}
+
+.switchRow input:checked::after {
+  transform: translateX(20px);
+  background: var(--accent);
+}
 
 .primary, .ghost, .copyRow button {
   border: 0;
@@ -201,10 +313,24 @@ select {
 
 .primary {
   width: 100%;
-  min-height: 54px;
-  padding: 0 18px;
+  min-height: 56px;
+  padding: 0 20px;
   background: var(--accent);
   color: var(--accentText);
+  font-size: 16px;
+  letter-spacing: -.01em;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(184,255,90,.08);
+  transition: transform .18s ease, filter .18s ease;
+}
+
+.primary:not(:disabled):hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+.primary:not(:disabled):active {
+  transform: translateY(0);
 }
 
 .primary:disabled { opacity: .35; cursor: not-allowed; }
@@ -344,6 +470,8 @@ footer {
   .shell { width: min(100% - 22px, 920px); padding-top: 18px; }
   .topbar { margin-bottom: 52px; }
   .pill { display: none; }
+  .topActions { margin-left: auto; }
+  .languageSwitcher button { min-width: 32px; padding: 0 6px; }
   .options, .trust { grid-template-columns: 1fr; }
   .trust { margin-bottom: 44px; }
   .card, .receiveCard { padding: 14px; }
