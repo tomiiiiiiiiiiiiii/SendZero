@@ -448,16 +448,40 @@ function sz_master_probe_node($nodeId, $node) {
     $auth = sz_node_status_auth($secret, $timestamp);
     $target = $url . '/api/node_status.php';
 
-    $context = stream_context_create(array(
-        'http' => array(
-            'method' => 'GET',
-            'timeout' => SENDZERO_NODE_STATUS_TIMEOUT,
-            'ignore_errors' => true,
-            'header' => "X-SendZero-Node-Auth: " . $auth . "\r\n"
-        )
-    ));
+    $raw = false;
 
-    $raw = @file_get_contents($target, false, $context);
+    if (function_exists('curl_init')) {
+        $ch = curl_init($target);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, max(1, (int)ceil(SENDZERO_NODE_STATUS_TIMEOUT)));
+        curl_setopt($ch, CURLOPT_TIMEOUT, max(1, (int)ceil(SENDZERO_NODE_STATUS_TIMEOUT + 1)));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'X-SendZero-Node-Auth: ' . $auth
+        ));
+
+        $raw = curl_exec($ch);
+        $statusCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($statusCode < 200 || $statusCode >= 300) {
+            $raw = false;
+        }
+    }
+
+    if ($raw === false) {
+        $context = stream_context_create(array(
+            'http' => array(
+                'method' => 'GET',
+                'timeout' => SENDZERO_NODE_STATUS_TIMEOUT,
+                'ignore_errors' => true,
+                'header' => "X-SendZero-Node-Auth: " . $auth . "\r\n"
+            )
+        ));
+
+        $raw = @file_get_contents($target, false, $context);
+    }
+
     if ($raw === false) {
         return false;
     }
