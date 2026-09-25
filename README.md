@@ -1,229 +1,245 @@
 # SendZero
 
-A zero-access file-transfer MVP built with **PHP + JavaScript + HTML/CSS**.
+**Private, zero-access file sharing with client-side encryption, resumable transfers and database-free multi-server storage.**
 
-## What changed in the 5 GiB version
+SendZero encrypts files in the browser before upload. The server stores encrypted manifests and encrypted chunks, while the decryption key remains in the URL fragment after `#` and is not sent to PHP.
 
-SendZero no longer loads the entire file into browser memory. A file is split into **8 MiB plaintext chunks**. Every chunk is encrypted independently with **AES-256-GCM** and a fresh random IV, then uploaded immediately.
+The project is currently in **pre-public testing**. The 5 GiB transfer path is implemented, but it should not be considered production-validated until the full checklist in [docs/TESTING.md](docs/TESTING.md) has passed on the deployed HTTPS instance.
 
-That means a 5 GiB transfer needs only a small, bounded amount of browser memory instead of several gigabytes.
+## Highlights
+
+- client-side **AES-256-GCM** encryption via Web Crypto;
+- encrypted filename, MIME type and file metadata;
+- **8 MiB chunked transfers** with bounded browser memory usage;
+- maximum logical file size: **5 GiB**;
+- resumable uploads;
+- resumable large downloads in compatible Chromium-based browsers;
+- one-time downloads;
+- sender-controlled early revoke/delete;
+- local **Recent transfers** manager without accounts;
+- English, German and Polish interface;
+- anonymous, database-free rate limiting and abuse protection;
+- multi-server storage without MySQL, Redis or shared filesystems;
+- direct browser-to-node upload and download;
+- multi-node administration CLI;
+- Terms of Use, Privacy Policy and dedicated abuse contact;
+- production preflight checker;
+- GitHub Actions syntax checks for **PHP 5.6, PHP 8.2 and JavaScript**.
 
 ## Security model
 
-1. The browser generates a random 256-bit AES key.
-2. Filename, MIME type and file metadata are put in a separately encrypted manifest.
-3. Each file chunk is encrypted locally with AES-256-GCM.
-4. PHP stores only encrypted manifest/chunks.
-5. The share URL looks like:
+For every new transfer:
 
-   `download.html?id=TRANSFER_ID#k=DECRYPTION_KEY`
+1. the browser generates a random 256-bit AES key;
+2. filename, MIME type and file metadata are placed in an encrypted manifest;
+3. the file is split into 8 MiB plaintext chunks;
+4. every chunk is encrypted independently with AES-256-GCM and a fresh random IV;
+5. the chunk index is authenticated as AES-GCM additional authenticated data;
+6. PHP stores only encrypted data;
+7. the recipient link contains the decryption key only in the URL fragment:
 
-The fragment after `#` is not sent to PHP in HTTP requests, so the server does not receive the decryption key.
-
-Each encrypted chunk authenticates its chunk index as AES-GCM additional authenticated data, so swapping/reordering chunks causes decryption to fail.
-
-## Limits
-
-- Maximum logical file size: **5 GiB**
-- Chunk size: **8 MiB**
-- Retention: 1 hour / 24 hours / 7 days
-- Optional one-time transfer
-
-PHP only receives one chunk per request, so `upload_max_filesize` and `post_max_size` do **not** need to be 5 GiB.
-
-Suggested PHP settings:
-
-```ini
-upload_max_filesize = 10M
-post_max_size = 11M
-max_execution_time = 120
+```text
+https://sendzero.link/download.html?n=s1&id=TRANSFER_ID#k=DECRYPTION_KEY
 ```
 
-The PHP build must be **64-bit** for correct 5 GiB integer handling. PHP 5.6+ is supported by the backend code.
+Browsers do not send the fragment after `#` in HTTP requests, so the SendZero backend does not receive the decryption key during normal operation.
 
-## Public-service abuse protection
+Swapping or reordering encrypted chunks causes authentication/decryption to fail.
 
-SendZero includes database-free application limits suitable for an anonymous public service.
+### What the server can still see
 
-Default limits:
+Zero-access encryption does not mean zero metadata.
 
-- 30 new transfer allocations per client per hour;
-- 25 GiB of allocated transfer size per client per day;
-- 3 active uploads per client on each child node;
-- disk warning at 90% used;
-- automatic refusal of new uploads at 95% used.
+The service still needs technical information such as:
 
-Raw IP addresses are not stored by the application limiter. The master derives a local HMAC client tag and stores only counters in `DATA_DIR/.ratelimit/`.
+- transfer ID;
+- encrypted payload size;
+- chunk count;
+- creation and expiry timestamps;
+- selected storage node;
+- transfer state;
+- request/network metadata normally visible to the web server or hosting infrastructure.
 
-When running behind a trusted reverse proxy, configure `client_ip_header` explicitly; otherwise SendZero uses `REMOTE_ADDR`.
+See [privacy.html](privacy.html) for the public privacy policy.
 
-See [docs/PRODUCTION.md](docs/PRODUCTION.md) for production configuration and security-header details.
+## Transfer limits
 
-## Terms and acceptable use
+Default application limits:
 
-The public interface includes `terms.html`, a basic Terms of Use / Acceptable Use Policy covering prohibited content and abusive use.
+| Setting | Default |
+| --- | ---: |
+| Maximum file size | 5 GiB |
+| Plaintext chunk size | 8 MiB |
+| Retention | 1 h / 24 h / 7 d |
+| New allocations per client | 30 / hour |
+| Allocated upload size per client | 25 GiB / day |
+| Active uploads per client / node | 3 |
+| Active downloads per transfer / node | 8 |
+| Download egress allowance | 20× file size |
+| Minimum egress allowance | 5 GiB |
+| Disk warning | 90% used |
+| Stop new uploads | 95% used |
 
-The upload page links to these rules directly below the upload button, and both upload and download pages link to them from the footer.
+The abuse limits are configurable in `config.local.php`.
 
-The terms are available in English, German and Polish through the same language selector as the rest of the interface.
+The application rate limiter does **not** store raw client IP addresses. The master derives a local HMAC-based client tag and stores short-lived counters.
 
-## Privacy Policy
-
-The public interface includes `privacy.html` in English, German and Polish.
-
-It documents client-side encryption, technical metadata, infrastructure logs, the HMAC-based application rate limiter, LocalStorage/IndexedDB resume state, retention and the abuse contact.
-
-## Interface languages
-
-The web interface currently supports:
-
-- English (default)
-- German
-- Polish
-
-The selected language is stored locally in the browser and is shared between the upload and download pages. The interface uses one codebase and a shared translation layer in `assets/i18n.js`.
-
-The expiry selector uses a custom dark three-option control instead of the browser's native select menu, so its appearance stays consistent across platforms.
+When SendZero is deployed behind a trusted reverse proxy, configure `client_ip_header` explicitly. Otherwise `REMOTE_ADDR` is used.
 
 ## Resumable uploads
 
-Interrupted uploads can be continued instead of restarting from zero.
+Interrupted uploads can continue without starting again from zero.
 
-The browser stores a small resume record in local storage containing the transfer ID, upload token, encryption key and file identity. The plaintext file itself is **never** stored by SendZero.
+The browser stores a small local resume record containing:
 
-When the same file is selected again:
+- transfer ID;
+- upload token;
+- encryption key;
+- file identity/fingerprint;
+- node ID and API location;
+- chunk parameters.
 
-1. the browser authenticates to `api/resume.php` with the upload token;
-2. the server returns which encrypted chunk numbers are already present;
-3. SendZero reuses the original AES key;
-4. already uploaded chunks are skipped;
-5. only missing chunks are encrypted and uploaded.
+When the same file is selected again, SendZero:
 
-The resume endpoint does not receive the decryption key or filename. A valid resume request extends the incomplete-upload lease by another 6 hours. Completed uploads remove the local resume record.
+1. authenticates to `api/resume.php`;
+2. asks which encrypted chunks are already present;
+3. reuses the original AES key;
+4. skips completed chunks;
+5. uploads only the missing chunks.
 
-To avoid accidentally resuming a different file, the browser builds a local fingerprint from the filename, size, modification time and sampled file content.
+The plaintext file itself is never stored by SendZero.
 
-## Sender revoke
-
-Every new transfer receives a separate random delete capability in addition to the upload token and encryption key.
-
-The server stores only a SHA-256 hash of the delete token. After upload completes, the sender can use **Delete transfer now** to remove the encrypted server copy before its normal expiry.
-
-The delete capability is not included in the recipient share URL.
-
-## Local recent transfers
-
-After a transfer completes, the sender's browser stores the transfer ID, node ID and delete capability locally until the transfer expires. This powers the **Recent transfers** panel and lets the sender revoke a transfer after reloading the page.
-
-The list is local to that browser, requires no account, and is never uploaded to SendZero. Expired entries are removed automatically.
-
-## Download abuse protection
-
-Normal downloads now use short-lived server-side download sessions. Each child node limits how many active readers may download the same transfer at once and tracks total egress per transfer.
-
-Default limits:
-
-- 8 active download sessions per transfer;
-- egress allowance of 20× the logical file size;
-- minimum egress allowance of 5 GiB for small files.
-
-These limits are configurable in `config.local.php`.
+Incomplete upload sessions expire automatically.
 
 ## Resumable downloads
 
-Large downloads can also be resumed instead of restarting from zero when the browser supports the **File System Access API** (for example current Chromium-based browsers).
+Large downloads can be resumed when the browser supports the **File System Access API**.
 
-For resumable downloads SendZero stores only local resume metadata in IndexedDB:
+SendZero stores only local resume metadata in IndexedDB, including:
 
-- the transfer ID;
-- a handle to the user-selected local file;
-- the next verified chunk number;
-- the exact verified byte offset;
-- the one-time download session token when applicable;
-- a fingerprint of the decryption key, not the key itself.
+- transfer ID;
+- local file handle;
+- next verified chunk;
+- verified byte offset;
+- key fingerprint;
+- download session token.
 
-After each decrypted chunk is written successfully, the browser checkpoints the next chunk number and byte offset. If the page or browser closes, reopening the same SendZero link can continue from that checkpoint.
+Before resuming, the local partial file is truncated to the last verified offset so an unconfirmed tail cannot silently corrupt the result.
 
-Before resuming, SendZero truncates any unconfirmed tail after the last verified byte. If the partial local file is unexpectedly shorter than the recorded checkpoint, the resume state is rejected instead of silently creating a corrupted file.
+### Download fallback order
 
-For **one-time downloads**, the same authenticated download token can reclaim and extend its short server-side session. While an active one-time download is running, the browser refreshes the lease periodically so a slow multi-gigabyte transfer does not fail merely because the short download session expired.
+SendZero tries:
 
-### Fallback download modes
+1. **File System Access API** — direct sequential writes and true resume;
+2. **Service Worker streaming** — avoids building a huge Blob, but cannot resume after browser/page restart;
+3. **Blob fallback** — available for files up to 512 MiB.
 
-SendZero tries, in order:
+HTTPS is required in production for Web Crypto, Service Workers and secure browser APIs.
 
-1. File System Access API — direct sequential writes and true resumable downloads.
-2. A same-origin Service Worker streaming download (`sw.js`) — decrypted chunks are streamed into a browser download without assembling a huge Blob, but that browser-managed download cannot be resumed by SendZero after a page/browser restart.
-3. Blob fallback for files up to 512 MiB — not resumable.
+## One-time downloads
 
-HTTPS is required in production for Web Crypto, Service Workers and the secure browser APIs used by SendZero.
+A transfer can be marked as **one-time**.
 
-## Server layout
+The first successful completed download removes the encrypted server copy.
 
-```text
-SendZero/
-├── index.html
-├── download.html
-├── sw.js
-├── config.php
-├── cleanup.php
-├── api/
-│   ├── common.php
-│   ├── init.php
-│   ├── manifest_upload.php
-│   ├── resume.php
-│   ├── chunk.php
-│   ├── complete.php
-│   ├── info.php
-│   ├── manifest.php
-│   ├── start.php
-│   ├── chunk_get.php
-│   ├── finish.php
-│   └── abort.php
-├── assets/
-│   ├── app.js
-│   ├── download.js
-│   └── style.css
-└── data/
-```
+The active browser download session is authenticated so an interrupted one-time download can resume instead of losing access immediately.
 
-Each transfer gets its own directory:
+## Sender revoke and Recent transfers
 
-```text
-data/<transfer-id>/
-├── meta.json
-├── manifest.bin
-├── chunk_000000.bin
-├── chunk_000001.bin
-└── ...
-```
+Every new transfer receives a separate random **delete capability**.
+
+The server stores only a SHA-256 hash of that delete token.
+
+After upload, the sender can use **Delete transfer now** to remove the encrypted server copy before expiry.
+
+The delete token is **not** included in the recipient share URL.
+
+For convenience, the sender browser stores recent revoke capabilities locally until the related transfer expires. This powers the **Recent transfers** panel after a page reload.
+
+That list:
+
+- is local to that browser;
+- requires no account;
+- is never uploaded as a transfer list to SendZero;
+- is automatically cleaned when entries expire.
+
+Clearing browser storage removes local resume/revoke capabilities.
 
 ## Database-free multi-server mode
 
-SendZero can scale to multiple storage servers without MySQL, Redis or a shared filesystem.
+SendZero can scale across independent storage nodes without:
 
-The main server acts as a dispatcher: before a new upload it checks configured child nodes, selects one with sufficient capacity, and returns a short-lived signed allocation token. The browser then uploads encrypted chunks **directly** to that child node.
+- MySQL;
+- Redis;
+- a shared filesystem;
+- file migration between nodes.
 
-Download links contain the node ID:
+Architecture:
+
+```text
+                       sendzero.link
+                            |
+                      MASTER / UI
+                allocation + node routing
+                            |
+             +--------------+--------------+
+             |              |              |
+      s1.sendzero.link s2.sendzero.link s3.sendzero.link
+        local storage     local storage     local storage
+```
+
+For a new upload:
+
+1. the browser asks the master for an allocation;
+2. the master checks configured nodes;
+3. the master selects a node with sufficient capacity;
+4. the master returns a short-lived HMAC-signed allocation token;
+5. the browser uploads encrypted chunks **directly** to that node.
+
+The large file never passes through the master.
+
+Download links remember the storage node:
 
 ```text
 download.html?n=s2&id=TRANSFER_ID#k=DECRYPTION_KEY
 ```
 
-The master resolves the node ID to its current public URL, but file data never passes through the master.
+The master resolves `s2` to its public URL, then the browser downloads encrypted chunks directly from `s2`.
 
-A child can be removed from new allocations with `enabled => false` while all existing downloads stored on that child continue to work.
+A node can be disabled for new allocations while its existing files remain downloadable:
 
-See [docs/MULTI_SERVER.md](docs/MULTI_SERVER.md) for deployment examples for:
+```php
+'s2' => array(
+    'url' => 'https://s2.sendzero.link',
+    'secret' => 'PRIVATE_NODE_SECRET',
+    'enabled' => false,
+    'weight' => 100
+)
+```
 
-- one server running as `master + s1`;
-- a dedicated master;
-- independent `s1`, `s2`, `s3` child nodes;
-- adding capacity when disk space or network capacity becomes constrained.
+See [docs/MULTI_SERVER.md](docs/MULTI_SERVER.md) for deployment and expansion examples.
+
+## Abuse protection
+
+SendZero includes several layers intended for anonymous public operation:
+
+- hourly transfer-allocation limit;
+- daily allocated-byte limit;
+- per-client active-upload limit;
+- per-transfer active-download limit;
+- per-transfer egress accounting;
+- automatic disk emergency stop;
+- one-use allocation nonces;
+- signed master-to-node allocation tokens;
+- signed admin requests with timestamp + nonce replay protection.
+
+The default limits are intentionally configurable rather than hard-wired to one deployment.
+
+See [docs/PRODUCTION.md](docs/PRODUCTION.md).
 
 ## Abuse administration
 
-Run administration from the master server:
+The master includes a CLI for inspecting and deleting transfers across nodes:
 
 ```bash
 php sendzero-admin.php nodes
@@ -232,51 +248,272 @@ php sendzero-admin.php info s2 TRANSFER_ID
 php sendzero-admin.php delete s2 TRANSFER_ID
 ```
 
-Remote operations are authenticated to child nodes with the existing per-node HMAC secret. See [docs/ADMIN.md](docs/ADMIN.md).
+Remote node operations are authenticated with the existing per-node HMAC secret.
 
-## Preflight check
+The CLI does not require the recipient decryption key.
 
-Before testing or opening a deployment publicly, run:
+See [docs/ADMIN.md](docs/ADMIN.md).
+
+Public abuse reports can be sent to:
+
+```text
+abuse@sendzero.link
+```
+
+## Terms and privacy
+
+The public interface includes:
+
+- [Terms of Use / Acceptable Use Policy](terms.html);
+- [Privacy Policy](privacy.html);
+- abuse contact: `abuse@sendzero.link`.
+
+Both legal pages support:
+
+- English;
+- German;
+- Polish.
+
+## Requirements
+
+### Backend
+
+- PHP **5.6+**;
+- **64-bit PHP** for correct 5 GiB integer handling;
+- writable storage directory;
+- secure random source;
+- HTTPS for production;
+- cURL or `allow_url_fopen` when the master talks to remote nodes.
+
+### Suggested PHP limits
+
+SendZero uploads one encrypted chunk per request, so PHP does not need a 5 GiB request limit.
+
+Suggested values:
+
+```ini
+upload_max_filesize = 10M
+post_max_size = 11M
+max_execution_time = 120
+```
+
+For Nginx:
+
+```nginx
+client_max_body_size 11M;
+```
+
+## Quick start
+
+### 1. Create local configuration
+
+```bash
+cp config.local.example.php config.local.php
+```
+
+Adjust at least:
+
+```php
+return array(
+    'role' => 'both',
+    'node_id' => 's1',
+    'data_dir' => '/srv/sendzero-data'
+);
+```
+
+### 2. Create storage outside the public web root
+
+```bash
+mkdir -p /srv/sendzero-data
+chown -R www-data:www-data /srv/sendzero-data
+chmod 700 /srv/sendzero-data
+```
+
+Keeping `DATA_DIR` outside the application directory is strongly preferred for production.
+
+### 3. Configure the web server
+
+For Apache, the repository includes `.htaccess` rules for:
+
+- directory listing protection;
+- sensitive PHP/config file blocking;
+- Content Security Policy;
+- HSTS;
+- no-referrer policy;
+- anti-framing;
+- MIME sniffing protection;
+- Permissions Policy.
+
+For Nginx equivalents, see [docs/PRODUCTION.md](docs/PRODUCTION.md).
+
+### 4. Schedule cleanup
+
+Run on every storage node:
+
+```cron
+*/10 * * * * /usr/bin/php /path/to/SendZero/cleanup.php >/dev/null 2>&1
+```
+
+Cleanup removes expired transfers and stale internal state.
+
+### 5. Run preflight
 
 ```bash
 php sendzero-preflight.php https://sendzero.link
 ```
 
-The checker validates the PHP version/64-bit build, secure randomness, `DATA_DIR`, disk thresholds, node/master configuration, secrets, remote-node HTTP capability and the required HTTPS security headers.
+The checker validates:
 
-Warnings do not fail the command; hard configuration failures return a non-zero exit code.
+- PHP version;
+- 64-bit integer support;
+- secure randomness;
+- `DATA_DIR`;
+- disk capacity and emergency thresholds;
+- master/node configuration;
+- node secrets;
+- remote-node HTTP capability;
+- required HTTPS response headers.
 
-## Production test
+A hard configuration error returns a non-zero exit code.
 
-Before advertising the 5 GiB limit publicly, run the full deployed HTTPS checklist in [docs/TESTING.md](docs/TESTING.md).
+## Pre-public testing
 
-It covers full and interrupted 5 GiB upload/download, resume, SHA-256 verification, one-time deletion, abuse limits, disk emergency stop and response headers.
+Before advertising the service publicly, complete [docs/TESTING.md](docs/TESTING.md).
 
-## Cleanup
+At minimum verify:
 
-Run periodically:
+- normal upload/download;
+- full 5 GiB upload;
+- interrupted upload + resume;
+- full 5 GiB download;
+- interrupted download + resume;
+- SHA-256 equality between source and downloaded file;
+- one-time deletion;
+- sender revoke;
+- Recent transfers revoke after page reload;
+- upload abuse limits;
+- download abuse limits;
+- disk emergency stop;
+- admin CLI deletion;
+- required security headers.
 
-```bash
-*/10 * * * * /usr/bin/php /path/to/sendzero/cleanup.php >/dev/null 2>&1
+A completed 5 GiB transfer with a different SHA-256 hash is a release blocker.
+
+## CI
+
+GitHub Actions runs syntax checks on every push / pull request for:
+
+- PHP 5.6;
+- PHP 8.2;
+- JavaScript.
+
+Workflow:
+
+```text
+.github/workflows/syntax.yml
 ```
 
-Incomplete uploads automatically expire after 6 hours.
+## Interface languages
 
-## Production notes
+The web interface supports:
 
-- Move `DATA_DIR` outside the public web root if possible.
-- Use HTTPS only.
-- The included `.htaccess` sets a restrictive Content Security Policy, HSTS, no-referrer policy, anti-framing and Permissions-Policy headers for Apache.
-- Keep the built-in application rate limits enabled for anonymous public traffic.
-- Keep the disk warning/emergency-stop thresholds enabled on every child node.
-- Set web-server request/body limits above the 8 MiB chunk size.
-- Resumable uploads and File System Access downloads are supported.
-- Run `sendzero-preflight.php` and the production test checklist before public launch.
+- English — default;
+- German;
+- Polish.
+
+Language choice is stored locally in the browser.
+
+## Project layout
+
+```text
+SendZero/
+├── .github/workflows/syntax.yml
+├── index.html
+├── download.html
+├── terms.html
+├── privacy.html
+├── sw.js
+├── config.php
+├── config.local.example.php
+├── nodes.example.php
+├── cleanup.php
+├── sendzero-admin.php
+├── sendzero-preflight.php
+├── api/
+│   ├── admin.php
+│   ├── allocate.php
+│   ├── node.php
+│   ├── node_status.php
+│   ├── init.php
+│   ├── resume.php
+│   ├── manifest_upload.php
+│   ├── chunk.php
+│   ├── complete.php
+│   ├── info.php
+│   ├── manifest.php
+│   ├── start.php
+│   ├── chunk_get.php
+│   ├── finish.php
+│   ├── abort.php
+│   └── delete.php
+├── assets/
+│   ├── app.js
+│   ├── download.js
+│   ├── i18n.js
+│   └── style.css
+├── docs/
+│   ├── ADMIN.md
+│   ├── MULTI_SERVER.md
+│   ├── PRODUCTION.md
+│   └── TESTING.md
+├── tools/
+│   ├── make-large-test-file.sh
+│   └── verify-large-test-file.sh
+└── data/
+    └── .htaccess
+```
+
+Production storage should normally use a configured `DATA_DIR` outside this repository.
+
+## Documentation
+
+- [Multi-server deployment](docs/MULTI_SERVER.md)
+- [Production hardening](docs/PRODUCTION.md)
+- [Production test checklist](docs/TESTING.md)
+- [Abuse administration](docs/ADMIN.md)
+- [Terms of Use](terms.html)
+- [Privacy Policy](privacy.html)
+
+## Current status
+
+SendZero is still under active development and the repository remains private while pre-public testing is completed.
+
+Implemented:
+
+- client-side encryption;
+- 5 GiB chunked transfer path;
+- upload/download resume;
+- multi-node routing;
+- abuse protection;
+- sender revoke;
+- admin tooling;
+- preflight;
+- multilingual public/legal UI;
+- automated syntax CI.
+
+Still required before public launch:
+
+- run the deployment preflight on the real server;
+- confirm cleanup scheduling;
+- complete the production test checklist;
+- validate the real 5 GiB path end-to-end over HTTPS.
 
 ## License
 
 SendZero is licensed under the **GNU Affero General Public License v3.0 only (AGPL-3.0-only)**.
 
-You may use, study, modify, and redistribute the software under the terms of the AGPLv3. If you modify SendZero and make that modified version available to users over a network, you must offer those users access to the corresponding source code as required by the license.
+You may use, study, modify and redistribute SendZero under the terms of the AGPLv3.
+
+If you modify SendZero and make that modified version available to users over a network, you must offer those users access to the corresponding source code as required by the license.
 
 See [LICENSE](LICENSE) for the full license text.
