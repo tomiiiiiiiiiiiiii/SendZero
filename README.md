@@ -111,6 +111,12 @@ The server stores only a SHA-256 hash of the delete token. After upload complete
 
 The delete capability is not included in the recipient share URL.
 
+## Local recent transfers
+
+After a transfer completes, the sender's browser stores the transfer ID, node ID and delete capability locally until the transfer expires. This powers the **Recent transfers** panel and lets the sender revoke a transfer after reloading the page.
+
+The list is local to that browser, requires no account, and is never uploaded to SendZero. Expired entries are removed automatically.
+
 ## Download abuse protection
 
 Normal downloads now use short-lived server-side download sessions. Each child node limits how many active readers may download the same transfer at once and tracks total egress per transfer.
@@ -228,6 +234,18 @@ php sendzero-admin.php delete s2 TRANSFER_ID
 
 Remote operations are authenticated to child nodes with the existing per-node HMAC secret. See [docs/ADMIN.md](docs/ADMIN.md).
 
+## Preflight check
+
+Before testing or opening a deployment publicly, run:
+
+```bash
+php sendzero-preflight.php https://sendzero.link
+```
+
+The checker validates the PHP version/64-bit build, secure randomness, `DATA_DIR`, disk thresholds, node/master configuration, secrets, remote-node HTTP capability and the required HTTPS security headers.
+
+Warnings do not fail the command; hard configuration failures return a non-zero exit code.
+
 ## Production test
 
 Before advertising the 5 GiB limit publicly, run the full deployed HTTPS checklist in [docs/TESTING.md](docs/TESTING.md).
@@ -253,7 +271,7 @@ Incomplete uploads automatically expire after 6 hours.
 - Keep the disk warning/emergency-stop thresholds enabled on every child node.
 - Set web-server request/body limits above the 8 MiB chunk size.
 - Resumable uploads and File System Access downloads are supported.
-- Consider adding an explicit transfer manager UI for listing, cancelling and clearing interrupted transfers.
+- Run `sendzero-preflight.php` and the production test checklist before public launch.
 
 ## License
 
