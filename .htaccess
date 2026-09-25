@@ -11,7 +11,7 @@ Options -Indexes
 </FilesMatch>
 
 
-<FilesMatch "^(config(?:\.local)?\.php|nodes\.php|cleanup\.php)$">
+<FilesMatch "^(config(?:\.local)?\.php|nodes\.php|cleanup\.php|sendzero-admin\.php)$">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>
