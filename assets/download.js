@@ -191,6 +191,10 @@
     return new Uint8Array(plain);
   }
 
+  function expectedBytesForIndex(nextIndex) {
+    return Math.min(manifest.size, nextIndex * remoteInfo.chunk_size);
+  }
+
   function stateMatchesTransfer(state) {
     return !!(
       state &&
@@ -205,7 +209,8 @@
       state.next_index <= remoteInfo.chunk_count &&
       Number.isFinite(state.bytes_written) &&
       state.bytes_written >= 0 &&
-      state.bytes_written <= manifest.size
+      state.bytes_written <= manifest.size &&
+      state.bytes_written === expectedBytesForIndex(state.next_index)
     );
   }
 
@@ -317,6 +322,15 @@
       if (!granted) {
         const err = new Error('Permission to the partial local file is required to resume.');
         err.name = 'ResumePermissionError';
+        throw err;
+      }
+
+      const partialFile = await handle.getFile();
+      if (partialFile.size < state.bytes_written) {
+        const err = new Error(
+          'The partial local file is shorter than the last verified checkpoint.'
+        );
+        err.name = 'ResumeFileMismatchError';
         throw err;
       }
 
@@ -546,6 +560,7 @@
 
       downloadToken = session.token || '';
       sessionStarted = true;
+      let lastSessionRefresh = Date.now();
 
       if (sink.resumable) {
         await sink.checkpoint(
@@ -571,6 +586,20 @@
       }
 
       for (let index = startIndex; index < remoteInfo.chunk_count; index++) {
+        if (downloadToken && Date.now() - lastSessionRefresh > 20 * 60 * 1000) {
+          const refreshed = await postForm('api/start.php', {
+            id,
+            token: downloadToken
+          });
+
+          downloadToken = refreshed.token || downloadToken;
+          lastSessionRefresh = Date.now();
+
+          if (sink.resumable) {
+            await sink.checkpoint(index, bytesWritten, downloadToken);
+          }
+        }
+
         const url = new URL('api/chunk_get.php', location.href);
         url.searchParams.set('id', id);
         url.searchParams.set('index', String(index));
@@ -662,6 +691,12 @@
         status.textContent = 'Save cancelled.';
       } else if (err && err.name === 'ResumePermissionError') {
         status.textContent = err.message;
+      } else if (err && err.name === 'ResumeFileMismatchError') {
+        await deleteDownloadState(id);
+        resumeState = null;
+        status.textContent =
+          err.message + ' The saved resume state was cleared; start the download again.';
+        downloadBtn.textContent = 'Start download again';
       } else if (sink && sink.resumable && resumeState && resumeState.next_index > 0) {
         const pct = Math.floor((resumeState.next_index / remoteInfo.chunk_count) * 100);
         status.textContent =
