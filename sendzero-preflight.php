@@ -104,6 +104,106 @@ function pf_fetch_headers($url) {
     );
 }
 
+
+function pf_fetch_json($url, $headers) {
+    $status = 0;
+    $body = false;
+
+    if (!is_array($headers)) {
+        $headers = array();
+    }
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'SendZero-Preflight/1.0');
+
+        $body = curl_exec($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+    } else {
+        $headerText = '';
+        if (count($headers) > 0) {
+            $headerText = implode("\r\n", $headers) . "\r\n";
+        }
+
+        $context = stream_context_create(array(
+            'http' => array(
+                'method' => 'GET',
+                'timeout' => 10,
+                'ignore_errors' => true,
+                'header' => $headerText . "User-Agent: SendZero-Preflight/1.0\r\n"
+            )
+        ));
+
+        $body = @file_get_contents($url, false, $context);
+
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $line) {
+                if (preg_match('/^HTTP\/\S+\s+(\d+)/i', $line, $m)) {
+                    $status = (int)$m[1];
+                    break;
+                }
+            }
+        }
+    }
+
+    if ($body === false) {
+        return false;
+    }
+
+    $data = json_decode($body, true);
+
+    return array(
+        'status' => $status,
+        'data' => is_array($data) ? $data : false
+    );
+}
+
+function pf_check_upload_limits($label, $limits, $hardFailure) {
+    if (!is_array($limits)) {
+        if ($hardFailure) {
+            pf_fail($label . ' did not report PHP upload limits.');
+        } else {
+            pf_warn($label . ' did not report PHP upload limits.');
+        }
+        return;
+    }
+
+    $uploadRaw = isset($limits['upload_max_filesize'])
+        ? (string)$limits['upload_max_filesize']
+        : 'unknown';
+    $postRaw = isset($limits['post_max_size'])
+        ? (string)$limits['post_max_size']
+        : 'unknown';
+
+    $uploadOk = !empty($limits['upload_ok']);
+    $postOk = !empty($limits['post_ok']);
+
+    if ($uploadOk && $postOk) {
+        pf_pass(
+            $label . ' upload limits are sufficient: upload_max_filesize=' .
+            $uploadRaw . ', post_max_size=' . $postRaw . '.'
+        );
+        return;
+    }
+
+    $message =
+        $label . ' upload limits are too low for SendZero 8 MiB chunks: ' .
+        'upload_max_filesize=' . $uploadRaw . ', post_max_size=' . $postRaw .
+        '. Recommended: upload_max_filesize=10M and post_max_size=11M.';
+
+    if ($hardFailure) {
+        pf_fail($message);
+    } else {
+        pf_warn($message);
+    }
+}
+
 echo "SendZero preflight\n";
 echo "==================\n\n";
 
@@ -124,6 +224,9 @@ if (function_exists('random_bytes') || function_exists('openssl_random_pseudo_by
 } else {
     pf_fail('No secure random source is available.');
 }
+
+$cliUploadLimits = sz_php_upload_limits();
+pf_check_upload_limits('CLI PHP', $cliUploadLimits, false);
 
 if (in_array(SENDZERO_ROLE, array('master', 'node', 'both'), true)) {
     pf_pass('Role is configured as ' . SENDZERO_ROLE . '.');
@@ -258,6 +361,22 @@ if (sz_has_role('master')) {
             } else {
                 pf_pass('Node ' . $nodeId . ' has a configured private secret.');
             }
+
+            $remoteStatus = sz_master_probe_node($nodeId, $node);
+            if ($remoteStatus === false) {
+                pf_fail('Could not query runtime status from node ' . $nodeId . '.');
+            } elseif (isset($remoteStatus['php_upload_limits'])) {
+                pf_check_upload_limits(
+                    'Web PHP/FPM on node ' . $nodeId,
+                    $remoteStatus['php_upload_limits'],
+                    true
+                );
+            } else {
+                pf_warn(
+                    'Node ' . $nodeId .
+                    ' did not report web PHP upload limits. Deploy the current SendZero code on that node.'
+                );
+            }
         }
     }
 
@@ -318,11 +437,48 @@ if ($publicUrl !== '') {
                 }
             }
         }
+
+        if (sz_has_role('node')) {
+            try {
+                $localSecret = sz_local_node_secret();
+                $timestamp = time();
+                $auth = sz_node_status_auth($localSecret, $timestamp);
+                $statusUrl = rtrim($publicUrl, '/') . '/api/node_status.php';
+
+                $runtime = pf_fetch_json($statusUrl, array(
+                    'X-SendZero-Node-Auth: ' . $auth
+                ));
+
+                if (
+                    $runtime === false ||
+                    (int)$runtime['status'] !== 200 ||
+                    !is_array($runtime['data']) ||
+                    empty($runtime['data']['ok'])
+                ) {
+                    pf_fail('Could not verify web PHP/FPM runtime limits at ' . $publicUrl . '.');
+                } elseif (isset($runtime['data']['php_upload_limits'])) {
+                    pf_check_upload_limits(
+                        'Web PHP/FPM at ' . $publicUrl,
+                        $runtime['data']['php_upload_limits'],
+                        true
+                    );
+                } else {
+                    pf_fail('Web PHP/FPM did not report upload limits at ' . $publicUrl . '.');
+                }
+            } catch (Exception $e) {
+                pf_fail('Could not verify web PHP/FPM runtime limits: ' . $e->getMessage());
+            }
+        }
     }
 } else {
     pf_warn('Public HTTPS headers were not checked. Run: php sendzero-preflight.php https://sendzero.link');
 }
 
+if ($publicUrl === '') {
+    pf_warn('Web PHP/FPM upload limits were not checked. Pass the public URL, e.g. php sendzero-preflight.php https://sendzero.link');
+}
+
+pf_warn('Web-server body-size limits (for example Nginx client_max_body_size) cannot be proven by this preflight without sending a large request.');
 pf_warn('Cron/systemd cleanup scheduling cannot be verified from the application. Confirm cleanup.php is scheduled on every child node.');
 
 echo "\nSummary: ";
