@@ -41,6 +41,24 @@ max_execution_time = 120
 
 The PHP build must be **64-bit** for correct 5 GiB integer handling. PHP 5.6+ is supported by the backend code.
 
+## Resumable uploads
+
+Interrupted uploads can be continued instead of restarting from zero.
+
+The browser stores a small resume record in local storage containing the transfer ID, upload token, encryption key and file identity. The plaintext file itself is **never** stored by SendZero.
+
+When the same file is selected again:
+
+1. the browser authenticates to `api/resume.php` with the upload token;
+2. the server returns which encrypted chunk numbers are already present;
+3. SendZero reuses the original AES key;
+4. already uploaded chunks are skipped;
+5. only missing chunks are encrypted and uploaded.
+
+The resume endpoint does not receive the decryption key or filename. A valid resume request extends the incomplete-upload lease by another 6 hours. Completed uploads remove the local resume record.
+
+To avoid accidentally resuming a different file, the browser builds a local fingerprint from the filename, size, modification time and sampled file content.
+
 ## Large-file download
 
 SendZero decrypts files chunk by chunk as well.
@@ -66,6 +84,7 @@ SendZero/
 │   ├── common.php
 │   ├── init.php
 │   ├── manifest_upload.php
+│   ├── resume.php
 │   ├── chunk.php
 │   ├── complete.php
 │   ├── info.php
@@ -109,4 +128,4 @@ Incomplete uploads automatically expire after 6 hours.
 - Add rate limiting and per-IP / per-transfer quotas before public launch.
 - Consider free-space checks before accepting a transfer.
 - Set web-server request/body limits above the 8 MiB chunk size.
-- Consider resumable upload UI as the next feature: the server-side chunk design already makes it possible.
+- Resumable uploads are supported; consider adding an explicit transfer manager UI for listing/cancelling interrupted uploads.
