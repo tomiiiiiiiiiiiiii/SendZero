@@ -60,6 +60,19 @@ if (!sz_check_upload_token($meta, $token)) {
  */
 $meta['expires_at'] = time() + UPLOAD_SESSION_TTL;
 
+if (!empty($meta['client_tag'])) {
+    /*
+     * Refresh the active-upload lease on a legitimate resume. If the
+     * bookkeeping file was removed, reacquire the slot when possible.
+     * A bookkeeping failure must not destroy an otherwise valid transfer.
+     */
+    @sz_active_upload_acquire(
+        (string)$meta['client_tag'],
+        $id,
+        (int)$meta['expires_at']
+    );
+}
+
 ftruncate($fh, 0);
 rewind($fh);
 fwrite($fh, json_encode($meta));
