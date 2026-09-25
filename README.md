@@ -59,17 +59,34 @@ The resume endpoint does not receive the decryption key or filename. A valid res
 
 To avoid accidentally resuming a different file, the browser builds a local fingerprint from the filename, size, modification time and sampled file content.
 
-## Large-file download
+## Resumable downloads
 
-SendZero decrypts files chunk by chunk as well.
+Large downloads can also be resumed instead of restarting from zero when the browser supports the **File System Access API** (for example current Chromium-based browsers).
 
-It tries, in order:
+For resumable downloads SendZero stores only local resume metadata in IndexedDB:
 
-1. File System Access API — direct sequential writes to a chosen local file.
-2. A same-origin Service Worker streaming download (`sw.js`) — decrypted chunks are streamed into a browser download without assembling a huge Blob.
-3. Blob fallback for files up to 512 MiB.
+- the transfer ID;
+- a handle to the user-selected local file;
+- the next verified chunk number;
+- the exact verified byte offset;
+- the one-time download session token when applicable;
+- a fingerprint of the decryption key, not the key itself.
 
-Large-file behavior still depends on browser support. HTTPS is required in production for Web Crypto and Service Workers.
+After each decrypted chunk is written successfully, the browser checkpoints the next chunk number and byte offset. If the page or browser closes, reopening the same SendZero link can continue from that checkpoint.
+
+Before resuming, SendZero truncates any unconfirmed tail after the last verified byte. If the partial local file is unexpectedly shorter than the recorded checkpoint, the resume state is rejected instead of silently creating a corrupted file.
+
+For **one-time downloads**, the same authenticated download token can reclaim and extend its short server-side session. While an active one-time download is running, the browser refreshes the lease periodically so a slow multi-gigabyte transfer does not fail merely because the short download session expired.
+
+### Fallback download modes
+
+SendZero tries, in order:
+
+1. File System Access API — direct sequential writes and true resumable downloads.
+2. A same-origin Service Worker streaming download (`sw.js`) — decrypted chunks are streamed into a browser download without assembling a huge Blob, but that browser-managed download cannot be resumed by SendZero after a page/browser restart.
+3. Blob fallback for files up to 512 MiB — not resumable.
+
+HTTPS is required in production for Web Crypto, Service Workers and the secure browser APIs used by SendZero.
 
 ## Server layout
 
@@ -128,4 +145,5 @@ Incomplete uploads automatically expire after 6 hours.
 - Add rate limiting and per-IP / per-transfer quotas before public launch.
 - Consider free-space checks before accepting a transfer.
 - Set web-server request/body limits above the 8 MiB chunk size.
-- Resumable uploads are supported; consider adding an explicit transfer manager UI for listing/cancelling interrupted uploads.
+- Resumable uploads and File System Access downloads are supported.
+- Consider adding an explicit transfer manager UI for listing, cancelling and clearing interrupted transfers.
