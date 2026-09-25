@@ -14,7 +14,7 @@ if ($index < 0 || $index >= (int)$meta['chunk_count']) {
     exit;
 }
 
-if (!sz_check_download_token($meta, $token)) {
+if (!sz_check_transfer_download_token($id, $meta, $token)) {
     http_response_code(403);
     exit;
 }
@@ -25,8 +25,16 @@ if (!is_file($path)) {
     exit;
 }
 
+$bytes = (int)filesize($path);
+
+if (!sz_download_egress_consume($id, $meta, $bytes)) {
+    header('Retry-After: 3600');
+    http_response_code(429);
+    exit;
+}
+
 header('Content-Type: application/octet-stream');
-header('Content-Length: ' . filesize($path));
+header('Content-Length: ' . $bytes);
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
 readfile($path);
