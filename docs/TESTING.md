@@ -2,6 +2,24 @@
 
 Run this after deploying the current code and before opening the service publicly.
 
+## 0. Preflight
+
+On the deployed server run:
+
+```bash
+php sendzero-preflight.php https://sendzero.link
+```
+
+Required result:
+
+```text
+PRE-FLIGHT PASSED
+```
+
+`PASSED WITH WARNINGS` is acceptable only after reviewing each warning. Any `FAIL` must be fixed before continuing.
+
+Also confirm that `cleanup.php` is actually scheduled on every storage node; the preflight tool cannot inspect cron/systemd scheduling.
+
 ## 1. Create a 5 GiB test file
 
 From the repository:
@@ -184,6 +202,16 @@ Do not call the 5 GiB path production-tested until all of these have passed on t
 Required result: the transfer is no longer available.
 
 Also confirm that the recipient share URL does not contain the sender delete token.
+
+Then create another disposable transfer:
+
+1. reload the sender page;
+2. confirm it appears under **Recent transfers**;
+3. revoke it from that list;
+4. reload again and confirm the entry is gone;
+5. verify the recipient link is unavailable.
+
+This confirms that the delete capability survives a sender-page reload without requiring an account.
 
 ## 11. Download abuse test
 
