@@ -41,6 +41,14 @@ max_execution_time = 120
 
 The PHP build must be **64-bit** for correct 5 GiB integer handling. PHP 5.6+ is supported by the backend code.
 
+## Terms and acceptable use
+
+The public interface includes `terms.html`, a basic Terms of Use / Acceptable Use Policy covering prohibited content and abusive use.
+
+The upload page links to these rules directly below the upload button, and both upload and download pages link to them from the footer.
+
+The terms are available in English, German and Polish through the same language selector as the rest of the interface.
+
 ## Interface languages
 
 The web interface currently supports:
