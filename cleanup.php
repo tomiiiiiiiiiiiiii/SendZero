@@ -24,4 +24,28 @@ foreach ($items as $id) {
     }
 }
 
-echo 'Removed: ' . $removed . PHP_EOL;
+$allocationRemoved = 0;
+$allocationDir = DATA_DIR . '/.allocations';
+
+if (is_dir($allocationDir)) {
+    $allocationFiles = @scandir($allocationDir);
+
+    if (is_array($allocationFiles)) {
+        foreach ($allocationFiles as $name) {
+            if ($name === '.' || $name === '..' || !preg_match('/^[a-f0-9]{32}$/', $name)) {
+                continue;
+            }
+
+            $path = $allocationDir . '/' . $name;
+            $expiresAt = (int)@file_get_contents($path);
+
+            if ($expiresAt <= time()) {
+                @unlink($path);
+                $allocationRemoved++;
+            }
+        }
+    }
+}
+
+echo 'Removed transfers: ' . $removed .
+    '; allocation tokens: ' . $allocationRemoved . PHP_EOL;
