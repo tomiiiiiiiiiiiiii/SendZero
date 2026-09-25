@@ -349,8 +349,9 @@
       trust_encrypt_desc: 'AES-256-GCM über Web Crypto. Bis zu 5 GiB.',
       trust_account_title: 'Kein Konto',
       trust_account_desc: 'Keine Registrierung erforderlich.',
-      trust_key_title: 'Kein Schlüssel auf dem Server',
-      trust_key_desc: 'Das URL-Fragment erreicht PHP niemals.',
+      trust_key_title: 'Der Schlüssel bleibt bei dir',
+      trust_key_desc: 'Der Entschlüsselungsschlüssel bleibt im Freigabelink und wird nie hochgeladen.',
+      github_link: 'GitHub',
       footer_private: 'Privater Dateiversand',
 
       download_eyebrow: 'PRIVATER TRANSFER',
