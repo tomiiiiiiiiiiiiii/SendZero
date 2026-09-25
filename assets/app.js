@@ -22,9 +22,12 @@
   const copyBtn = document.getElementById('copyBtn');
   const newBtn = document.getElementById('newBtn');
   const resultMeta = document.getElementById('resultMeta');
+  const deleteBtn = document.getElementById('deleteBtn');
+  const deleteHint = document.getElementById('deleteHint');
 
   let selectedFile = null;
   let selectedFingerprint = null;
+  let activeDeleteCapability = null;
 
   function formatBytes(bytes) {
     if (bytes < 1024) return bytes + ' B';
@@ -343,6 +346,7 @@
           node_id: allocation.node_id,
           api_base: allocation.api_base || '',
           upload_token: init.upload_token,
+          delete_token: init.delete_token || '',
           key: base64Url(keyBytes),
           chunk_size: init.chunk_size,
           chunk_count: init.chunk_count,
@@ -535,6 +539,16 @@
         t('expires', { date: expiry.toLocaleString() }) +
         (complete.once ? ' · ' + t('one_time_enabled') : '');
 
+      if (session.delete_token) {
+        activeDeleteCapability = {
+          id: session.id,
+          api_base: session.api_base || '',
+          token: session.delete_token
+        };
+        deleteBtn.classList.remove('hidden');
+        deleteHint.classList.remove('hidden');
+      }
+
       removeSession(selectedFingerprint);
 
       uploadCard.classList.add('hidden');
@@ -599,6 +613,33 @@
     } catch (e) {
       shareUrl.select();
       document.execCommand('copy');
+    }
+  });
+
+  deleteBtn.addEventListener('click', async () => {
+    if (!activeDeleteCapability) return;
+
+    if (!window.confirm(t('delete_confirm'))) {
+      return;
+    }
+
+    deleteBtn.disabled = true;
+
+    try {
+      await postForm(apiUrl(activeDeleteCapability.api_base, 'api/delete.php'), {
+        id: activeDeleteCapability.id,
+        token: activeDeleteCapability.token
+      });
+
+      activeDeleteCapability = null;
+      shareUrl.value = '';
+      copyBtn.disabled = true;
+      deleteBtn.classList.add('hidden');
+      deleteHint.classList.add('hidden');
+      resultMeta.textContent = t('transfer_deleted');
+    } catch (err) {
+      deleteBtn.disabled = false;
+      resultMeta.textContent = t('delete_failed', { error: err.message });
     }
   });
 
