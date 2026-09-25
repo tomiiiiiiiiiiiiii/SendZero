@@ -49,7 +49,24 @@ if (!isset($meta['state']) || $meta['state'] !== 'ready') {
 if (empty($meta['once'])) {
     flock($fh, LOCK_UN);
     fclose($fh);
-    sz_json(array('ok' => true, 'token' => '', 'resumed' => false), 200);
+
+    $session = sz_download_session_start($id, $resumeToken);
+    if (empty($session['ok'])) {
+        $status = isset($session['error']) && $session['error'] === 'too_many_active_downloads'
+            ? 429
+            : 503;
+
+        sz_json(array(
+            'ok' => false,
+            'error' => isset($session['error']) ? $session['error'] : 'download_session_unavailable'
+        ), $status);
+    }
+
+    sz_json(array(
+        'ok' => true,
+        'token' => $session['token'],
+        'resumed' => !empty($session['resumed'])
+    ), 200);
 }
 
 /*
