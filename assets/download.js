@@ -742,6 +742,8 @@
 
       if (err && err.name === 'AbortError') {
         status.textContent = t('save_cancelled');
+      } else if (err && err.status === 429) {
+        status.textContent = err.message || t('download_limit_reached');
       } else if (err && err.name === 'ResumePermissionError') {
         status.textContent = err.message;
       } else if (err && err.name === 'ResumeFileMismatchError') {
