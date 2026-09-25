@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/common.php';
 
+sz_require_role('node');
+
 $id = isset($_GET['id']) ? strtolower($_GET['id']) : '';
 $index = isset($_GET['index']) ? (int)$_GET['index'] : -1;
 $token = isset($_GET['token']) ? strtolower($_GET['token']) : '';
