@@ -4,7 +4,9 @@
   const MAX_BYTES = 5 * 1024 * 1024 * 1024;
   const t = (key, vars) => window.SendZeroI18n.t(key, vars);
   const RESUME_STORAGE_KEY = 'sendzero_upload_sessions_v1';
+  const RECENT_STORAGE_KEY = 'sendzero_recent_transfers_v1';
   const LOCAL_SESSION_MAX_AGE = 8 * 60 * 60 * 1000;
+  const RECENT_MAX_ITEMS = 20;
 
   const fileInput = document.getElementById('fileInput');
   const dropzone = document.getElementById('dropzone');
@@ -24,6 +26,8 @@
   const resultMeta = document.getElementById('resultMeta');
   const deleteBtn = document.getElementById('deleteBtn');
   const deleteHint = document.getElementById('deleteHint');
+  const recentCard = document.getElementById('recentCard');
+  const recentList = document.getElementById('recentList');
 
   let selectedFile = null;
   let selectedFingerprint = null;
@@ -113,6 +117,125 @@
     const sessions = loadSessions();
     delete sessions[fingerprint];
     localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(sessions));
+  }
+
+
+  function loadRecentTransfers() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(RECENT_STORAGE_KEY) || '[]');
+      const now = Math.floor(Date.now() / 1000);
+      const list = Array.isArray(raw) ? raw : [];
+      const cleaned = list.filter(entry =>
+        entry &&
+        /^[a-f0-9]{32}$/.test(entry.id || '') &&
+        /^[A-Za-z0-9_-]{1,32}$/.test(entry.node_id || '') &&
+        /^[a-f0-9]{64}$/.test(entry.delete_token || '') &&
+        Number(entry.expires_at) > now
+      ).sort((a, b) => Number(b.created_at || 0) - Number(a.created_at || 0))
+        .slice(0, RECENT_MAX_ITEMS);
+
+      if (JSON.stringify(cleaned) !== JSON.stringify(raw)) {
+        localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(cleaned));
+      }
+
+      return cleaned;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveRecentTransfer(entry) {
+    const list = loadRecentTransfers().filter(item =>
+      !(item.id === entry.id && item.node_id === entry.node_id)
+    );
+
+    list.unshift(entry);
+    localStorage.setItem(
+      RECENT_STORAGE_KEY,
+      JSON.stringify(list.slice(0, RECENT_MAX_ITEMS))
+    );
+  }
+
+  function removeRecentTransfer(nodeId, id) {
+    const list = loadRecentTransfers().filter(item =>
+      !(item.id === id && item.node_id === nodeId)
+    );
+
+    localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(list));
+  }
+
+  async function revokeRecentTransfer(entry, button) {
+    if (!window.confirm(t('delete_confirm'))) return;
+
+    button.disabled = true;
+
+    try {
+      const resolved = await resolveNode(entry.node_id);
+
+      await postForm(apiUrl(resolved.api_base || '', 'api/delete.php'), {
+        id: entry.id,
+        token: entry.delete_token
+      });
+
+      removeRecentTransfer(entry.node_id, entry.id);
+      renderRecentTransfers();
+    } catch (err) {
+      if (err && err.status === 404) {
+        removeRecentTransfer(entry.node_id, entry.id);
+        renderRecentTransfers();
+        return;
+      }
+
+      button.disabled = false;
+      button.textContent = t('recent_delete_failed');
+      setTimeout(() => {
+        button.textContent = t('recent_delete');
+      }, 1800);
+    }
+  }
+
+  function renderRecentTransfers() {
+    if (!recentCard || !recentList) return;
+
+    const list = loadRecentTransfers();
+    recentList.textContent = '';
+
+    if (list.length === 0) {
+      recentCard.classList.add('hidden');
+      return;
+    }
+
+    list.forEach(entry => {
+      const row = document.createElement('div');
+      row.className = 'recentItem';
+
+      const info = document.createElement('div');
+      info.className = 'recentInfo';
+
+      const name = document.createElement('strong');
+      name.textContent = entry.file_name || (entry.id.slice(0, 8) + '…');
+
+      const meta = document.createElement('span');
+      meta.textContent =
+        formatBytes(Number(entry.file_size || 0)) + ' · ' +
+        t('expires', { date: new Date(Number(entry.expires_at) * 1000).toLocaleString() }) +
+        ' · ' + entry.node_id;
+
+      info.appendChild(name);
+      info.appendChild(meta);
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'recentDelete';
+      button.textContent = t('recent_delete');
+      button.addEventListener('click', () => revokeRecentTransfer(entry, button));
+
+      row.appendChild(info);
+      row.appendChild(button);
+      recentList.appendChild(row);
+    });
+
+    recentCard.classList.remove('hidden');
   }
 
   async function fingerprintFile(file) {
@@ -542,9 +665,23 @@
       if (session.delete_token) {
         activeDeleteCapability = {
           id: session.id,
+          node_id: session.node_id,
           api_base: session.api_base || '',
           token: session.delete_token
         };
+
+        saveRecentTransfer({
+          id: session.id,
+          node_id: session.node_id,
+          delete_token: session.delete_token,
+          file_name: selectedFile.name,
+          file_size: selectedFile.size,
+          expires_at: complete.expires_at,
+          once: !!complete.once,
+          created_at: Math.floor(Date.now() / 1000)
+        });
+
+        renderRecentTransfers();
         deleteBtn.classList.remove('hidden');
         deleteHint.classList.remove('hidden');
       }
@@ -574,9 +711,11 @@
   });
 
   syncTtlPicker();
+  renderRecentTransfers();
 
   window.addEventListener('sendzero:languagechange', () => {
     syncTtlPicker();
+    renderRecentTransfers();
     if (selectedFile && !sendBtn.disabled) {
       setFile(selectedFile);
     }
@@ -631,6 +770,11 @@
         token: activeDeleteCapability.token
       });
 
+      removeRecentTransfer(
+        activeDeleteCapability.node_id || 'local',
+        activeDeleteCapability.id
+      );
+      renderRecentTransfers();
       activeDeleteCapability = null;
       shareUrl.value = '';
       copyBtn.disabled = true;
