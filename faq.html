@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>SendZero — FAQ</title>
+  <meta name="description" content="Frequently asked questions about SendZero private file sharing.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body data-page="faq">
+  <main class="shell legalShell">
+    <header class="topbar">
+      <a class="brand" href="./" data-i18n-aria="home_aria" aria-label="SendZero home">
+        <span class="brandMark">0</span>
+        <span>SendZero</span>
+      </a>
+
+      <div class="topActions">
+        <span class="pill" data-i18n="faq_pill">help</span>
+        <div class="languageSwitcher" aria-label="Language">
+          <button type="button" data-lang="en">EN</button>
+          <button type="button" data-lang="de">DE</button>
+          <button type="button" data-lang="pl">PL</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="legalHero">
+      <p class="eyebrow" data-i18n="faq_eyebrow">FREQUENTLY ASKED QUESTIONS</p>
+      <h1 data-i18n="faq_title">Questions, without the fine print.</h1>
+      <p class="lede" data-i18n="faq_intro">
+        The important things to know before sending or receiving a file with SendZero.
+      </p>
+    </section>
+
+    <section class="faqList">
+      <details open>
+        <summary data-i18n="faq_q1">Who can decrypt my file?</summary>
+        <p data-i18n="faq_a1">Anyone who has the complete share link, including the part after #. Treat that link like a secret.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q2">Does SendZero receive the decryption key?</summary>
+        <p data-i18n="faq_a2">No during normal operation. The key is kept in the URL fragment after #, and browsers do not send that fragment to the server in HTTP requests.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q3">Can SendZero see the filename or file contents?</summary>
+        <p data-i18n="faq_a3">The filename, MIME type, metadata and file chunks are encrypted in your browser before upload. The server still sees technical metadata such as transfer ID, sizes, timestamps, node and request information.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q4">What happens if I lose the full share link?</summary>
+        <p data-i18n="faq_a4">SendZero cannot reconstruct the decryption key for you. Without the complete link, the encrypted file cannot normally be decrypted.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q5">How large can a file be?</summary>
+        <p data-i18n="faq_a5">The current limit is 5 GiB per file. Files are split into 8 MiB chunks so the browser does not need to keep the entire file in memory.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q6">Can an interrupted upload be resumed?</summary>
+        <p data-i18n="faq_a6">Yes. Select the same local file again in the same browser. SendZero can reuse the local upload state and send only missing encrypted chunks while that upload session is still valid.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q7">Can an interrupted download be resumed?</summary>
+        <p data-i18n="faq_a7">Yes in supported Chromium-based browsers using the File System Access API. Other browsers may use streaming or Blob fallbacks that do not support resume after a browser restart.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q8">What does one-time download mean?</summary>
+        <p data-i18n="faq_a8">After the first successfully completed download, the encrypted server copy is deleted. An interrupted authenticated download can still resume instead of consuming the transfer immediately.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q9">Can I delete a transfer before it expires?</summary>
+        <p data-i18n="faq_a9">Yes. The sender receives a separate private delete capability. Use Delete transfer now or the Recent transfers panel in the same browser.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q10">What is stored under Recent transfers?</summary>
+        <p data-i18n="faq_a10">Only local sender-side information needed to revoke recent transfers, including the transfer and node IDs plus the delete capability. This list stays in that browser and disappears when browser storage is cleared or entries expire.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q11">What happens when a transfer expires?</summary>
+        <p data-i18n="faq_a11">Its encrypted server copy is removed by cleanup and the share link stops working. SendZero is a temporary transfer service, not a backup service.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q12">Why can an upload or download be temporarily limited?</summary>
+        <p data-i18n="faq_a12">SendZero applies abuse, concurrency, disk-capacity and download-traffic limits so one anonymous user or link cannot exhaust the service for everyone else.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q13">Do I need an account?</summary>
+        <p data-i18n="faq_a13">No. Sending and receiving files does not require registration or a SendZero account.</p>
+      </details>
+
+      <details>
+        <summary data-i18n="faq_q14">How do I report an abusive transfer?</summary>
+        <p data-i18n="faq_a14">Email abuse@sendzero.link with the SendZero transfer URL and a clear description. Do not include the decryption key unless it is necessary for the report.</p>
+      </details>
+    </section>
+
+    <p class="legalNote" data-i18n="faq_note">
+      For service rules and technical privacy details, see the Terms of Use and Privacy Policy.
+    </p>
+
+    <footer>
+      <span>SendZero</span>
+      <span class="footerLinks">
+        <a href="./" data-i18n="back_home">Back to SendZero</a>
+        <span aria-hidden="true">·</span>
+        <a href="terms.html" data-i18n="terms_link">Terms</a>
+        <span aria-hidden="true">·</span>
+        <a href="privacy.html" data-i18n="privacy_link">Privacy</a>
+        <span aria-hidden="true">·</span>
+        <a href="mailto:abuse@sendzero.link" data-i18n="report_abuse">Report abuse</a>
+      </span>
+    </footer>
+  </main>
+
+  <script src="assets/i18n.js"></script>
+</body>
+</html>
