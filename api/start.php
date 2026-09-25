@@ -61,7 +61,11 @@ if (
     isset($meta['download_token_hash']) &&
     sz_safe_equals($meta['download_token_hash'], hash('sha256', $resumeToken))
 ) {
-    $meta['download_session_expires'] = time() + DOWNLOAD_SESSION_TTL;
+    $leaseUntil = time() + DOWNLOAD_SESSION_TTL;
+    $meta['download_session_expires'] = $leaseUntil;
+    if ((int)$meta['expires_at'] < $leaseUntil) {
+        $meta['expires_at'] = $leaseUntil;
+    }
 
     ftruncate($fh, 0);
     rewind($fh);
@@ -96,7 +100,11 @@ try {
 }
 
 $meta['download_token_hash'] = hash('sha256', $token);
-$meta['download_session_expires'] = time() + DOWNLOAD_SESSION_TTL;
+$leaseUntil = time() + DOWNLOAD_SESSION_TTL;
+$meta['download_session_expires'] = $leaseUntil;
+if ((int)$meta['expires_at'] < $leaseUntil) {
+    $meta['expires_at'] = $leaseUntil;
+}
 
 ftruncate($fh, 0);
 rewind($fh);
