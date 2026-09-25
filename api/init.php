@@ -70,6 +70,7 @@ if ($chunkCount < 1 || $chunkCount > 10000) {
 try {
     $id = sz_random_hex(16);
     $uploadToken = sz_random_hex(32);
+    $deleteToken = sz_random_hex(32);
 } catch (Exception $e) {
     sz_json(array('ok' => false, 'error' => 'server_random_unavailable'), 500);
 }
@@ -101,7 +102,8 @@ $meta = array(
     'chunk_size' => CHUNK_BYTES,
     'chunk_count' => $chunkCount,
     'once' => $once ? 1 : 0,
-    'upload_token_hash' => hash('sha256', $uploadToken)
+    'upload_token_hash' => hash('sha256', $uploadToken),
+    'delete_token_hash' => hash('sha256', $deleteToken)
 );
 
 if (!sz_write_meta($id, $meta)) {
@@ -115,6 +117,7 @@ sz_json(array(
     'id' => $id,
     'node_id' => SENDZERO_NODE_ID,
     'upload_token' => $uploadToken,
+    'delete_token' => $deleteToken,
     'chunk_size' => CHUNK_BYTES,
     'chunk_count' => $chunkCount,
     'max_file_bytes' => MAX_FILE_BYTES
