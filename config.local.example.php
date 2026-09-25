@@ -36,7 +36,31 @@ return array(
     // Extra safety margin checked by the master for every new transfer.
     'reserve_bytes' => 2 * 1024 * 1024 * 1024,
 
+    // Emergency disk thresholds. At 90% the node reports a warning;
+    // at 95% it automatically refuses NEW uploads.
+    'warn_disk_used_percent' => 90,
+    'max_disk_used_percent' => 95,
+
     'require_allocation' => true,
+
+    /*
+     * File-based anti-abuse limits. Raw IP addresses are not stored:
+     * the master keeps only a local HMAC-derived client tag and counters.
+     */
+    'rate_limit_enabled' => true,
+    'rate_max_allocations_per_hour' => 30,
+    'rate_max_bytes_per_day' => 25 * 1024 * 1024 * 1024,
+
+    // Enforced independently by each child node.
+    'max_active_uploads_per_client' => 3,
+
+    /*
+     * Leave empty when PHP sees the real client in REMOTE_ADDR.
+     * When behind a TRUSTED reverse proxy which overwrites the header,
+     * set e.g. 'HTTP_CF_CONNECTING_IP'. Never enable a spoofable header
+     * directly from the public Internet.
+     */
+    'client_ip_header' => '',
 
     // Cross-origin browser access from the master UI.
     'allowed_origins' => array(
