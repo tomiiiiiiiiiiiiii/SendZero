@@ -440,6 +440,7 @@ SendZero/
 ├── terms.html
 ├── privacy.html
 ├── faq.html
+├── favicon.svg
 ├── sw.js
 ├── config.php
 ├── config.local.example.php
