@@ -1,4 +1,6 @@
 data/*
 !data/.htaccess
+config.local.php
+nodes.php
 .DS_Store
 Thumbs.db
