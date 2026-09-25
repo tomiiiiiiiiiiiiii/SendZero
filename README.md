@@ -41,6 +41,18 @@ max_execution_time = 120
 
 The PHP build must be **64-bit** for correct 5 GiB integer handling. PHP 5.6+ is supported by the backend code.
 
+## Interface languages
+
+The web interface currently supports:
+
+- English (default)
+- German
+- Polish
+
+The selected language is stored locally in the browser and is shared between the upload and download pages. The interface uses one codebase and a shared translation layer in `assets/i18n.js`.
+
+The expiry selector uses a custom dark three-option control instead of the browser's native select menu, so its appearance stays consistent across platforms.
+
 ## Resumable uploads
 
 Interrupted uploads can be continued instead of restarting from zero.
