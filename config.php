@@ -52,6 +52,11 @@ define('SENDZERO_RATE_MAX_ALLOCATIONS_PER_HOUR', (int)sz_config_value('rate_max_
 define('SENDZERO_RATE_MAX_BYTES_PER_DAY', (float)sz_config_value('rate_max_bytes_per_day', 26843545600)); // 25 GiB
 define('SENDZERO_NODE_MAX_ACTIVE_UPLOADS_PER_CLIENT', (int)sz_config_value('max_active_uploads_per_client', 3));
 
+/* Download / egress abuse protection on each storage node. */
+define('SENDZERO_NODE_MAX_ACTIVE_DOWNLOADS_PER_TRANSFER', (int)sz_config_value('max_active_downloads_per_transfer', 8));
+define('SENDZERO_DOWNLOAD_EGRESS_MULTIPLIER', (float)sz_config_value('download_egress_multiplier', 20.0));
+define('SENDZERO_DOWNLOAD_MIN_EGRESS_BYTES', (float)sz_config_value('download_min_egress_bytes', 5368709120)); // 5 GiB
+
 /*
  * Only use a forwarded-IP header when the web server is behind a trusted
  * reverse proxy that overwrites it. Example: HTTP_CF_CONNECTING_IP.
