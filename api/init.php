@@ -25,18 +25,42 @@ if (!SENDZERO_NODE_ACCEPT_UPLOADS) {
 }
 
 $free = @disk_free_space(DATA_DIR);
+$total = @disk_total_space(DATA_DIR);
+
 if ($free === false) {
     $free = 0;
 }
+if ($total === false) {
+    $total = 0;
+}
+
+$usedPercent = $total > 0
+    ? max(0.0, min(100.0, (($total - $free) / $total) * 100.0))
+    : 100.0;
 
 $required = (float)$fileSize + SENDZERO_NODE_RESERVE_BYTES;
-if ($free < $required || $free < SENDZERO_NODE_MIN_FREE_BYTES) {
-    sz_json(array('ok' => false, 'error' => 'node_insufficient_space'), 507);
+
+if (
+    $free < $required ||
+    $free < SENDZERO_NODE_MIN_FREE_BYTES ||
+    $usedPercent >= SENDZERO_NODE_MAX_DISK_USED_PERCENT
+) {
+    sz_json(array(
+        'ok' => false,
+        'error' => 'node_insufficient_space',
+        'disk_used_percent' => round($usedPercent, 2)
+    ), 507);
 }
 
-if (!sz_verify_and_claim_allocation($allocation, $fileSize, $ttl, $once)) {
+$allocationPayload = sz_verify_and_claim_allocation($allocation, $fileSize, $ttl, $once);
+if ($allocationPayload === false) {
     sz_json(array('ok' => false, 'error' => 'invalid_allocation'), 403);
 }
+
+$clientTag = isset($allocationPayload['client']) &&
+    preg_match('/^[a-f0-9]{32}$/', (string)$allocationPayload['client'])
+    ? (string)$allocationPayload['client']
+    : sz_client_tag();
 
 $chunkCount = (int)ceil($fileSize / CHUNK_BYTES);
 if ($chunkCount < 1 || $chunkCount > 10000) {
@@ -50,18 +74,28 @@ try {
     sz_json(array('ok' => false, 'error' => 'server_random_unavailable'), 500);
 }
 
-$dir = sz_transfer_dir($id);
-if (!@mkdir($dir, 0700, true)) {
-    sz_json(array('ok' => false, 'error' => 'store_failed'), 500);
+$now = time();
+$uploadExpiresAt = $now + UPLOAD_SESSION_TTL;
+
+if (!sz_active_upload_acquire($clientTag, $id, $uploadExpiresAt)) {
+    sz_json(array(
+        'ok' => false,
+        'error' => 'too_many_active_uploads'
+    ), 429);
 }
 
-$now = time();
+$dir = sz_transfer_dir($id);
+if (!@mkdir($dir, 0700, true)) {
+    sz_active_upload_release($clientTag, $id);
+    sz_json(array('ok' => false, 'error' => 'store_failed'), 500);
+}
 $meta = array(
     'version' => 3,
     'node_id' => SENDZERO_NODE_ID,
     'state' => 'uploading',
     'created_at' => $now,
-    'expires_at' => $now + UPLOAD_SESSION_TTL,
+    'expires_at' => $uploadExpiresAt,
+    'client_tag' => $clientTag,
     'retention_ttl' => $ttl,
     'file_size' => (int)$fileSize,
     'chunk_size' => CHUNK_BYTES,
@@ -71,6 +105,7 @@ $meta = array(
 );
 
 if (!sz_write_meta($id, $meta)) {
+    sz_active_upload_release($clientTag, $id);
     sz_delete_transfer($id);
     sz_json(array('ok' => false, 'error' => 'metadata_failed'), 500);
 }
