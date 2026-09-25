@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>SendZero — private file sharing</title>
+  <meta name="description" content="Encrypt in your browser. Share a link. The server never receives the decryption key.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="SendZero home">
+        <span class="brandMark">0</span>
+        <span>SendZero</span>
+      </a>
+      <span class="pill">zero-access transfer</span>
+    </header>
+
+    <section class="hero">
+      <p class="eyebrow">PRIVATE FILE SHARING</p>
+      <h1>Send a file.<br><span>Reveal nothing.</span></h1>
+      <p class="lede">
+        Your file is encrypted locally before upload. The decryption key stays in the share link fragment and is never sent to SendZero.
+      </p>
+    </section>
+
+    <section class="card" id="uploadCard">
+      <label class="dropzone" id="dropzone" for="fileInput">
+        <input id="fileInput" type="file" hidden>
+        <span class="dropIcon">↑</span>
+        <strong id="dropTitle">Choose a file</strong>
+        <span id="dropText">or drop it here · max 5 GiB</span>
+      </label>
+
+      <div class="options">
+        <label>
+          <span>Expires after</span>
+          <select id="ttl">
+            <option value="3600">1 hour</option>
+            <option value="86400" selected>24 hours</option>
+            <option value="604800">7 days</option>
+          </select>
+        </label>
+
+        <label class="switchRow">
+          <span>
+            <strong>One-time download</strong>
+            <small>Delete server copy after the first completed transfer.</small>
+          </span>
+          <input id="once" type="checkbox">
+        </label>
+      </div>
+
+      <button class="primary" id="sendBtn" disabled>Encrypt & upload</button>
+
+      <div class="progressWrap hidden" id="progressWrap">
+        <div class="progress"><span id="progressBar"></span></div>
+        <p id="status">Preparing…</p>
+      </div>
+    </section>
+
+    <section class="result card hidden" id="resultCard">
+      <p class="eyebrow">READY</p>
+      <h2>Your private link</h2>
+      <p class="muted">Anyone with the complete link can decrypt the file. The part after <code>#</code> is the key.</p>
+      <div class="copyRow">
+        <input id="shareUrl" readonly>
+        <button id="copyBtn">Copy</button>
+      </div>
+      <p class="resultMeta" id="resultMeta"></p>
+      <button class="ghost" id="newBtn">Send another file</button>
+    </section>
+
+    <section class="trust">
+      <div><strong>Chunked client-side encryption</strong><span>AES-256-GCM via Web Crypto. Up to 5 GiB.</span></div>
+      <div><strong>No account</strong><span>No sign-up is required.</span></div>
+      <div><strong>No key on server</strong><span>The URL fragment never reaches PHP.</span></div>
+    </section>
+
+    <footer>
+      <span>SendZero MVP</span>
+      <span>PHP · JavaScript · HTML</span>
+    </footer>
+  </main>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
