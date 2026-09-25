@@ -604,3 +604,85 @@ footer a:hover {
   line-height: 1.5;
   text-align: center;
 }
+
+
+.recentCard {
+  margin-top: 18px;
+}
+
+.recentIntro {
+  margin: 0 0 16px;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.recentList {
+  display: grid;
+  gap: 8px;
+}
+
+.recentItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel2);
+}
+
+.recentInfo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.recentInfo strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recentInfo span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.recentDelete {
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  border: 1px solid rgba(255,114,114,.22);
+  border-radius: 10px;
+  background: rgba(255,114,114,.05);
+  color: #ffabab;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.recentDelete:hover {
+  border-color: rgba(255,114,114,.4);
+  background: rgba(255,114,114,.09);
+}
+
+.recentDelete:disabled {
+  opacity: .45;
+  cursor: wait;
+}
+
+@media (max-width: 560px) {
+  .recentItem {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recentDelete {
+    width: 100%;
+  }
+}
