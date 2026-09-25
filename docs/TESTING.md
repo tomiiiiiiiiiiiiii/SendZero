@@ -171,3 +171,55 @@ Do not call the 5 GiB path production-tested until all of these have passed on t
 - anti-abuse rejection;
 - disk emergency stop;
 - security headers.
+
+
+## 10. Sender revoke test
+
+1. Upload a normal transfer.
+2. Confirm that the result screen shows **Delete transfer now**.
+3. Copy the recipient share URL for verification.
+4. Click the delete button and confirm deletion.
+5. Open the recipient share URL in a separate/private browser window.
+
+Required result: the transfer is no longer available.
+
+Also confirm that the recipient share URL does not contain the sender delete token.
+
+## 11. Download abuse test
+
+Use a temporary test configuration:
+
+```php
+'max_active_downloads_per_transfer' => 1,
+'download_egress_multiplier' => 1,
+'download_min_egress_bytes' => 0
+```
+
+Verify:
+
+1. the first download session starts;
+2. a second simultaneous session for the same transfer receives HTTP 429;
+3. finishing or aborting the first non-resumable download releases its session;
+4. after enough encrypted chunk bytes are served to exhaust the egress allowance, further chunk requests receive HTTP 429.
+
+Restore production limits afterwards.
+
+## 12. Admin CLI test
+
+From the master:
+
+```bash
+php sendzero-admin.php nodes
+php sendzero-admin.php status
+php sendzero-admin.php info NODE_ID TRANSFER_ID
+```
+
+Create a disposable test transfer and delete it with:
+
+```bash
+php sendzero-admin.php delete NODE_ID TRANSFER_ID
+```
+
+Required result: the share URL becomes unavailable immediately.
+
+For a multi-node setup, perform this test against at least one remote child node to verify HMAC administration.
