@@ -133,7 +133,31 @@ if (is_dir($activeDir)) {
     }
 }
 
+$adminNonceRemoved = 0;
+$adminNonceDir = DATA_DIR . '/.admin_nonces';
+
+if (is_dir($adminNonceDir)) {
+    $nonceFiles = @scandir($adminNonceDir);
+
+    if (is_array($nonceFiles)) {
+        foreach ($nonceFiles as $name) {
+            if ($name === '.' || $name === '..' || !preg_match('/^[a-f0-9]{32}$/', $name)) {
+                continue;
+            }
+
+            $path = $adminNonceDir . '/' . $name;
+            $expiresAt = (int)@file_get_contents($path);
+
+            if ($expiresAt <= time()) {
+                @unlink($path);
+                $adminNonceRemoved++;
+            }
+        }
+    }
+}
+
 echo 'Removed transfers: ' . $removed .
     '; allocation tokens: ' . $allocationRemoved .
     '; rate-limit buckets: ' . $rateLimitRemoved .
-    '; active-upload states cleaned: ' . $activeStateCleaned . PHP_EOL;
+    '; active-upload states cleaned: ' . $activeStateCleaned .
+    '; admin nonces: ' . $adminNonceRemoved . PHP_EOL;
