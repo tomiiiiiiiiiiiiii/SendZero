@@ -659,7 +659,11 @@
         const response = await fetch(url.toString(), { cache: 'no-store' });
 
         if (!response.ok) {
-          const err = new Error(t('chunk_download_failed', { current: index + 1 }));
+          const err = new Error(
+            response.status === 429
+              ? t('download_limit_reached')
+              : t('chunk_download_failed', { current: index + 1 })
+          );
           err.status = response.status;
           throw err;
         }
