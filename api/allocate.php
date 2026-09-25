@@ -28,6 +28,21 @@ $nodeId = $selected['id'];
 $node = $selected['node'];
 $secret = sz_master_node_secret($node);
 
+
+$clientTag = sz_client_tag();
+$rate = sz_rate_limit_consume($fileSize, $clientTag);
+
+if (empty($rate['ok'])) {
+    $retryAfter = isset($rate['retry_after']) ? max(1, (int)$rate['retry_after']) : 60;
+    header('Retry-After: ' . $retryAfter);
+
+    sz_json(array(
+        'ok' => false,
+        'error' => isset($rate['error']) ? $rate['error'] : 'rate_limited',
+        'retry_after' => $retryAfter
+    ), 429);
+}
+
 if ($secret === '') {
     sz_json(array('ok' => false, 'error' => 'node_not_configured'), 503);
 }
@@ -44,6 +59,7 @@ $payload = array(
     'size' => (int)$fileSize,
     'ttl' => $ttl,
     'once' => $once ? 1 : 0,
+    'client' => $clientTag,
     'exp' => time() + SENDZERO_ALLOCATION_TTL,
     'nonce' => $nonce
 );
