@@ -36,6 +36,11 @@ if (!is_array($meta)) {
 if (empty($meta['once'])) {
     flock($fh, LOCK_UN);
     fclose($fh);
+
+    if (sz_download_session_valid($id, $token)) {
+        sz_download_session_release($id, $token);
+    }
+
     sz_json(array('ok' => true), 200);
 }
 
