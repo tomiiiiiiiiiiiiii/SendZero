@@ -10,7 +10,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $fileSize = (float)sz_read_request_value('file_size', 0);
 $ttl = (int)sz_read_request_value('ttl', 86400);
 $once = sz_read_request_value('once', '0') === '1';
-$requestId = strtolower((string)sz_read_request_value('request_id', ''));
 
 if ($fileSize <= 0 || $fileSize > MAX_FILE_BYTES) {
     sz_json(array('ok' => false, 'error' => 'invalid_file_size'), 413);
@@ -22,7 +21,7 @@ if (!in_array($ttl, $GLOBALS['SENDZERO_TTLS'], true)) {
 
 
 $clientTag = sz_client_tag();
-$preRate = sz_rate_limit_consume($fileSize, $clientTag, $requestId, false);
+$preRate = sz_rate_limit_consume($fileSize, $clientTag, false);
 
 if (empty($preRate['ok'])) {
     $retryAfter = isset($preRate['retry_after']) ? max(1, (int)$preRate['retry_after']) : 60;
@@ -49,7 +48,7 @@ $secret = sz_master_node_secret($node);
  * Commit the quota only after a healthy node was found. The second locked
  * check also closes the race between simultaneous allocation requests.
  */
-$rate = sz_rate_limit_consume($fileSize, $clientTag, $requestId, true);
+$rate = sz_rate_limit_consume($fileSize, $clientTag, true);
 
 if (empty($rate['ok'])) {
     $retryAfter = isset($rate['retry_after']) ? max(1, (int)$rate['retry_after']) : 60;
