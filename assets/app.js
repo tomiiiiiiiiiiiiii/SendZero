@@ -328,7 +328,9 @@
       node_insufficient_space: 'error_node_insufficient_space',
       no_storage_node_available: 'error_no_storage_node',
       rate_limit_unavailable: 'error_service_busy',
-      rate_limit_busy: 'error_service_busy'
+      rate_limit_busy: 'error_service_busy',
+      request_too_large: 'error_request_too_large',
+      upload_failed: 'error_upload_failed'
     };
 
     return keys[code] ? t(keys[code]) : code;
@@ -344,7 +346,14 @@
     try { data = await response.json(); } catch (e) {}
 
     if (!response.ok || !data || !data.ok) {
-      const code = data && data.error ? data.error : null;
+      let code = data && data.error ? data.error : null;
+
+      // A reverse proxy or web server may reject the request before PHP
+      // can return JSON. Preserve a useful message for HTTP 413 anyway.
+      if (!code && response.status === 413) {
+        code = 'request_too_large';
+      }
+
       const err = new Error(code ? apiErrorMessage(code) : ('HTTP ' + response.status));
       err.status = response.status;
       err.code = code;
