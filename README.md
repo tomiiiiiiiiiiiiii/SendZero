@@ -259,11 +259,7 @@ The CLI does not require the recipient decryption key.
 
 See [docs/ADMIN.md](docs/ADMIN.md).
 
-Public abuse reports can be sent to:
-
-```text
-abuse@sendzero.link
-```
+Public abuse reports can be sent using the dedicated abuse contact on the deployed service.
 
 ## FAQ, terms and privacy
 
@@ -272,7 +268,7 @@ The public interface includes:
 - [FAQ](faq.html) for common sender/recipient questions;
 - [Terms of Use / Acceptable Use Policy](terms.html);
 - [Privacy Policy](privacy.html);
-- abuse contact: `abuse@sendzero.link`.
+- abuse contact available on the deployed service.
 
 These public information pages support:
 
