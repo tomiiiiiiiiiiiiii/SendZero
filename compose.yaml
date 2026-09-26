@@ -1,0 +1,33 @@
+name: sendzero
+
+services:
+  sendzero:
+    build:
+      context: .
+    image: sendzero:local
+    ports:
+      - "${SENDZERO_PORT:-8080}:80"
+    volumes:
+      - sendzero-data:/srv/sendzero-data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(@file_get_contents(\"http://127.0.0.1/\") === false ? 1 : 0);'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  cleanup:
+    build:
+      context: .
+    image: sendzero:local
+    command:
+      - sh
+      - -c
+      - while true; do php /var/www/html/cleanup.php; sleep 600; done
+    volumes:
+      - sendzero-data:/srv/sendzero-data
+    restart: unless-stopped
+
+volumes:
+  sendzero-data:

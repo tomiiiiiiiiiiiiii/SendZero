@@ -28,7 +28,8 @@ The core transfer path is **production-tested on the deployed HTTPS instance at 
 - production preflight checker;
 - responsible vulnerability reporting policy;
 - full-history credential/configuration audit in CI;
-- GitHub Actions syntax checks for **PHP 5.6, PHP 8.2 and JavaScript**.
+- GitHub Actions syntax checks for **PHP 5.6, PHP 8.2 and JavaScript**;
+- Docker Compose deployment with persistent storage and scheduled cleanup.
 
 ## Security model
 
@@ -310,7 +311,27 @@ For Nginx:
 client_max_body_size 11M;
 ```
 
-## Quick start
+## Docker Compose quick start
+
+With Docker Engine and Docker Compose v2 installed:
+
+```bash
+git clone https://github.com/tomiiiiiiiiiiiiii/SendZero.git
+cd SendZero
+docker compose up -d --build
+```
+
+Then open:
+
+```text
+http://localhost:8080
+```
+
+The default stack runs SendZero on Apache/PHP 8.2, keeps encrypted transfer data in a persistent named volume outside the web root, and runs cleanup every 10 minutes in a companion container.
+
+For a public deployment, put the container behind HTTPS and review [docs/DOCKER.md](docs/DOCKER.md) plus [docs/PRODUCTION.md](docs/PRODUCTION.md).
+
+## Manual quick start
 
 ### 1. Create local configuration
 
@@ -444,6 +465,8 @@ Syntax checks cover:
 - PHP 8.2;
 - JavaScript.
 
+CI also validates the Docker Compose configuration, builds the Docker image and performs a basic container smoke test.
+
 A separate release-hygiene workflow checks the complete Git history for recognized credential patterns and forbidden private/runtime files.
 
 Workflows:
@@ -451,6 +474,7 @@ Workflows:
 ```text
 .github/workflows/syntax.yml
 .github/workflows/history-audit.yml
+.github/workflows/release.yml
 ```
 
 ## Interface languages
@@ -469,7 +493,17 @@ Language choice is stored locally in the browser.
 SendZero/
 ├── .github/workflows/
 │   ├── syntax.yml
-│   └── history-audit.yml
+│   ├── history-audit.yml
+│   └── release.yml
+├── Dockerfile
+├── compose.yaml
+├── .dockerignore
+├── VERSION
+├── CHANGELOG.md
+├── docker/
+│   ├── apache-sendzero.conf
+│   ├── php-sendzero.ini
+│   └── entrypoint.sh
 ├── index.html
 ├── download.html
 ├── terms.html
@@ -508,6 +542,7 @@ SendZero/
 │   └── style.css
 ├── docs/
 │   ├── ADMIN.md
+│   ├── DOCKER.md
 │   ├── MULTI_SERVER.md
 │   ├── PRODUCTION.md
 │   └── TESTING.md
@@ -524,6 +559,7 @@ Production storage should normally use a configured `DATA_DIR` outside this repo
 ## Documentation
 
 - [Security policy](SECURITY.md)
+- [Docker Compose deployment](docs/DOCKER.md)
 - [Multi-server deployment](docs/MULTI_SERVER.md)
 - [Production hardening](docs/PRODUCTION.md)
 - [Production test checklist](docs/TESTING.md)

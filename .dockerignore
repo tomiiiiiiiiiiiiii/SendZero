@@ -1,0 +1,14 @@
+.git
+.github
+data/*
+!data/.htaccess
+config.local.php
+nodes.php
+.env
+*.pem
+*.key
+sendzero-5g-test.bin
+sendzero-5g-test.bin.sha256
+sendzero-5g-test-downloaded.bin
+.DS_Store
+Thumbs.db

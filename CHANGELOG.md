@@ -4,6 +4,16 @@ All notable changes to SendZero are documented here.
 
 The project follows semantic versioning from `v1.0.0` onward.
 
+## [Unreleased]
+
+### Added
+
+- Dockerfile based on Apache and PHP 8.2 with PHP cURL support.
+- Docker Compose single-node deployment with persistent storage outside the web root.
+- Companion cleanup service running transfer cleanup every 10 minutes.
+- Docker-specific Apache/PHP configuration and automatic minimal single-node configuration.
+- Docker deployment documentation, Compose validation, image build and container smoke test in CI.
+
 ## [1.0.0] - 2026-09-26
 
 First public 1.0 release of SendZero.
