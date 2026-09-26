@@ -657,12 +657,15 @@
     const saved = localStorage.getItem(STORAGE_KEY);
     if (SUPPORTED.indexOf(saved) !== -1) return saved;
 
-    try {
-      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (timeZone === 'Europe/Warsaw') return 'pl';
-      if (timeZone === 'Europe/Berlin' || timeZone === 'Europe/Busingen') return 'de';
-    } catch (error) {
-      // Keep the default language when the browser cannot expose a time zone.
+    const browserLanguages =
+      Array.isArray(navigator.languages) && navigator.languages.length
+        ? navigator.languages
+        : [navigator.language || ''];
+
+    for (let i = 0; i < browserLanguages.length; i += 1) {
+      const code = String(browserLanguages[i]).toLowerCase().split('-')[0];
+      if (code === 'pl') return 'pl';
+      if (code === 'de') return 'de';
     }
 
     return DEFAULT_LANGUAGE;
