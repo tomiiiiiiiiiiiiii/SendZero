@@ -662,18 +662,7 @@
       if (timeZone === 'Europe/Warsaw') return 'pl';
       if (timeZone === 'Europe/Berlin' || timeZone === 'Europe/Busingen') return 'de';
     } catch (error) {
-      // Fall back to browser language below.
-    }
-
-    const browserLanguages =
-      Array.isArray(navigator.languages) && navigator.languages.length
-        ? navigator.languages
-        : [navigator.language || ''];
-
-    for (let i = 0; i < browserLanguages.length; i += 1) {
-      const code = String(browserLanguages[i]).toLowerCase().split('-')[0];
-      if (code === 'pl') return 'pl';
-      if (code === 'de') return 'de';
+      // Keep the default language when the browser cannot expose a time zone.
     }
 
     return DEFAULT_LANGUAGE;
