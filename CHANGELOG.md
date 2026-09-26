@@ -6,6 +6,8 @@ The project follows semantic versioning from `v1.0.0` onward.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-26
+
 ### Added
 
 - Dockerfile based on Apache and PHP 8.2 with PHP cURL support.
@@ -13,6 +15,12 @@ The project follows semantic versioning from `v1.0.0` onward.
 - Companion cleanup service running transfer cleanup every 10 minutes.
 - Docker-specific Apache/PHP configuration and automatic minimal single-node configuration.
 - Docker deployment documentation, Compose validation, image build and container smoke test in CI.
+
+### Notes
+
+- Existing non-Docker deployments are unchanged.
+- The default Compose setup is intended for a single-node installation; multi-node Docker deployments can use custom `config.local.php` and `nodes.php`.
+- Public deployments still require HTTPS and the production hardening described in `docs/PRODUCTION.md`.
 
 ## [1.0.0] - 2026-09-26
 
